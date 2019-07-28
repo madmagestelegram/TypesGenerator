@@ -1,6 +1,6 @@
 #index:
 #    path: /
-#    defaults: { _controller: 'Madmages\TypeGenerator\Controller\DefaultController::index' }
+#    defaults: { _controller: 'MadmagesTelegram\TypesGenerator\Controller\DefaultController::index' }
 
 # first, run composer req annotations
 #controllers:

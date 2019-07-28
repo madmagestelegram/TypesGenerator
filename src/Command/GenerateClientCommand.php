@@ -1,6 +1,6 @@
 <?php
 
-namespace Madmages\TypeGenerator\Command;
+namespace MadmagesTelegram\TypesGenerator\Command;
 
 use RuntimeException;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
@@ -10,7 +10,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class GenerateClientCommand extends ContainerAwareCommand
 {
 
-    public const BASE_NAMESPACE = 'Madmages\\TelegramType';
+    public const BASE_NAMESPACE = 'MadmagesTelegram\\Types';
     public const BASE_NAMESPACE_TYPES = self::BASE_NAMESPACE . '\\Type';
 
     protected function configure(): void

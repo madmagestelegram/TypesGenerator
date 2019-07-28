@@ -1,6 +1,6 @@
 <?php
 
-use Madmages\TypeGenerator\Kernel;
+use MadmagesTelegram\TypesGenerator\Kernel;
 use Symfony\Component\Debug\Debug;
 use Symfony\Component\Dotenv\Dotenv;
 use Symfony\Component\HttpFoundation\Request;

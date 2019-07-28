@@ -1,6 +1,6 @@
 <?php
 
-namespace Madmages\TypeGenerator\Command;
+namespace MadmagesTelegram\TypesGenerator\Command;
 
 use ParseError;
 use RuntimeException;

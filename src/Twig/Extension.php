@@ -1,6 +1,6 @@
 <?php
 
-namespace Madmages\TypeGenerator\Twig;
+namespace MadmagesTelegram\TypesGenerator\Twig;
 
 use RuntimeException;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
