@@ -1,0 +1,74 @@
+<?php declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use JMS\Serializer\Annotation\ExclusionPolicy;
+use JMS\Serializer\Annotation\AccessType;
+use JMS\Serializer\Annotation\SkipWhenEmpty;
+use JMS\Serializer\Annotation\SerializedName;
+use JMS\Serializer\Annotation\Accessor;
+use JMS\Serializer\Annotation\Type;
+
+/**
+ * {{ type.link }}
+ *
+{% for description in type.descriptions %}
+ * {{ description|paramDescription(1,' ')|striptags|raw }}
+{% endfor %}
+ *
+ * @ExclusionPolicy("none")
+ * @AccessType("public_method")
+ */
+class {{ type.name }} extends {{ getClassName(type.parent, namespace) }}
+{
+{% for field in type.fields %}
+    /**
+     * {{ field.description|striptags }}
+     *
+     * @var {{ renderType(field.type, namespace, true) }}
+{%- if not field.required -%}|null
+     * @SkipWhenEmpty
+{%- endif %}
+
+     * @SerializedName("{{ field.name }}")
+     * @Accessor(getter="{{ ('get_' ~ field.name)|camelize }}",setter="{{ ('set' ~ field.name)|camelize }}")
+     * @Type("{{ renderJMSType(field.type)|raw }}")
+     */
+    protected ${{ field.name|camelize }};
+
+{% endfor %}
+
+{% for field in type.fields %}
+    /**
+     * @param {{ renderType(field.type, namespace, true) }} ${{ field.name|camelize }}
+     * @return static
+     */
+    public function {{ ('set_' ~ field.name)|camelize }}(
+        {{- renderType(field.type, namespace, false) }} ${{ field.name|camelize -}}
+    ): self
+    {
+        $this->{{ field.name|camelize }} = ${{ field.name|camelize }};
+
+        return $this;
+    }
+
+    /**
+     * @return {{ renderType(field.type, namespace, true) }}
+    {%- if field.required == false -%}
+        |null
+    {%- endif %}
+
+     */
+    public function {{ ('get_' ~ field.name)|camelize }}()
+     {%- if isValidCodeType(field.type) -%}: {% if field.required == false -%}
+             ?
+         {%- endif -%}
+         {{ renderType(field.type, namespace, false) }}
+    {%- endif %}
+
+    {
+        return $this->{{ field.name|camelize }};
+    }
+
+{% endfor %}
+}

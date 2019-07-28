@@ -1,0 +1,62 @@
+{
+    "name": "madmages/telegramtypegenerator",
+    "description": "Generates telegram type files from api description",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^7.2",
+        "ext-json": "*",
+        "jms/serializer": "^3.1",
+        "psr/http-message": "^1.0",
+        "symfony/console": "^4.3",
+        "symfony/css-selector": "^4.3",
+        "symfony/dom-crawler": "^4.3",
+        "symfony/flex": "^1.0",
+        "symfony/framework-bundle": "^4.3",
+        "symfony/serializer": "^4.3",
+        "symfony/twig-bundle": "^4.3",
+        "symfony/var-dumper": "^4.3",
+        "symfony/yaml": "^4.3"
+    },
+    "require-dev": {
+        "symfony/dotenv": "^4.3"
+    },
+    "config": {
+        "preferred-install": {
+            "*": "dist"
+        },
+        "sort-packages": true
+    },
+    "autoload": {
+        "psr-4": {
+            "Madmages\\TypeGenerator\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Madmages\\TypeGenerator\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "auto-scripts": {
+            "cache:clear": "symfony-cmd",
+            "assets:install --symlink --relative %PUBLIC_DIR%": "symfony-cmd",
+            "assets:install %PUBLIC_DIR%": "symfony-cmd"
+        },
+        "post-install-cmd": [
+            "@auto-scripts"
+        ],
+        "post-update-cmd": [
+            "@auto-scripts"
+        ]
+    },
+    "conflict": {
+        "symfony/symfony": "*"
+    },
+    "extra": {
+        "symfony": {
+            "id": "01BWYRQA0PVTRHBB2EPSR4B5RZ",
+            "allow-contrib": true
+        }
+    }
+}

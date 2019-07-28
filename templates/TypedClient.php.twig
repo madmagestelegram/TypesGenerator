@@ -1,0 +1,127 @@
+<?php declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use JMS\Serializer\SerializerInterface;
+use JMS\Serializer\SerializerBuilder;
+use RuntimeException;
+use Doctrine\Common\Annotations\AnnotationRegistry;
+
+abstract class TypedClient {
+
+    /** @var SerializerInterface */
+    private static $serializer;
+
+    /**
+     * Real request engine
+     * Should return json string
+     *
+     * @param string $method
+     * @param array  $parameters
+     * @return string Returned json string
+     */
+    abstract protected function _apiRequest(string $method, array $parameters): string;
+
+    /**
+     * @return SerializerInterface
+     */
+    private static function _getSerializer(): SerializerInterface
+    {
+        if (self::$serializer === null) {
+            if (!class_exists(AnnotationRegistry::class, false)) {
+                AnnotationRegistry::registerLoader('class_exists');
+            }
+
+            self::$serializer = SerializerBuilder::create()->build();
+        }
+
+        return self::$serializer;
+    }
+
+    /**
+     * @param string $method
+     * @param array  $requestParams
+     * @param array  $returnType
+     * @return mixed
+     */
+    private function _requestWithMap(string $method, array $requestParams, array $returnType)
+    {
+        $jsonString = $this->_apiRequest($method, $this->_prepareRequest($requestParams));
+        if (empty($returnType)) {
+            return json_decode($jsonString, true);
+        }
+
+        if (count($returnType) > 1) {
+            throw new RuntimeException('More than one type not implemented');
+        }
+
+        return self::deserialize($jsonString, $returnType[0]);
+    }
+
+    private function _prepareRequest(array $requestParams): array
+    {
+        $requestParams = array_filter($requestParams, static function ($i) {
+            return $i !== null;
+        });
+        if (empty($requestParams)) {
+            return [];
+        }
+
+        array_walk_recursive($requestParams, function (&$item) {
+            if (!is_object($item)) {
+                return;
+            }
+
+            $item = json_decode($this->_getSerializer()->serialize($item, 'json'), true);
+        });
+
+        return $requestParams;
+    }
+
+    public static function deserialize(string $jsonString, string $type) {
+        return self::_getSerializer()->deserialize($jsonString, $type, 'json');
+    }
+
+{% for method in schema.methods %}
+
+    /**
+     * {{ method.link }}
+     *
+     * {{ method.description|paramDescription(2)|striptags|raw }}
+     *
+{% for parameter in method.parameters|sortByOptional %}
+     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
+     *        {{ parameter.description|paramDescription(6)|raw }}
+     *
+{% endfor %}
+     * @return {{ renderType(method.return,namespace,true) }};
+     */
+    public function {{ method.name }}(
+{% for parameter in method.parameters|sortByOptional %}
+        {% if isValidCodeType(parameter.type) -%} {{ renderType(parameter.type, namespace, false) }} {% endif -%}
+        ${{ parameter.name|camelize }}
+        {%- if not parameter.required %} = null{% endif %}
+        {%- if loop.index < method.parameters|length %},{% endif %}
+
+{% endfor %}
+    ){% if isValidCodeType(method.return) -%}
+        : {{ renderType(method.return, namespace, false) }}
+    {%- endif %}
+
+    {
+        $requestParameters = [
+{% for parameter in method.parameters %}
+            '{{ parameter.name }}' => ${{ parameter.name|camelize }},
+{% endfor %}
+        ];
+
+        $returnType = [
+{% for JMSReturnType in getJMSReturnType(method.return, namespace) %}
+            {{ JMSReturnType|raw }},
+{% endfor %}
+        ];
+
+        return $this->_requestWithMap('{{ method.name }}', $requestParameters, $returnType);
+    }
+{% endfor %}
+}

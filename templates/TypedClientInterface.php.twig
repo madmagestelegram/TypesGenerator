@@ -1,0 +1,32 @@
+<?php declare(strict_types=1);
+
+namespace {{ namespace }};
+
+interface TypedClientInterface {
+{% for method in schema.methods %}
+
+    /**
+     * {{ method.link }}
+     *
+     * {{ method.description|paramDescription(2)|striptags|raw }}
+     *
+{% for parameter in method.parameters|sortByOptional %}
+     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
+     *        {{ parameter.description|paramDescription(6)|raw }}
+     *
+{% endfor %}
+     * @return {{ renderType(method.return,namespace,true) }};
+     */
+    public function {{ method.name }}(
+{% for parameter in method.parameters|sortByOptional %}
+        {% if isValidCodeType(parameter.type) -%} {{ renderType(parameter.type, namespace, false) }} {% endif -%}
+        ${{ parameter.name|camelize }}
+        {%- if not parameter.required %} = null{% endif %}
+        {%- if loop.index < method.parameters|length %},{% endif %}
+
+{% endfor %}
+    ){% if isValidCodeType(method.return) -%}
+        : {{ renderType(method.return, namespace, false) }}
+    {%- endif -%};
+{% endfor %}
+}

@@ -1,0 +1,49 @@
+<?php declare(strict_types=1);
+
+namespace {{ namespace }};
+
+abstract class Client {
+
+    /**
+     * Method call handler
+     *
+     * @param string $method
+     * @param array  $parameters
+     * @return mixed
+     */
+    abstract protected function _apiRequest(string $method, array $parameters);
+
+{% for method in schema.methods %}
+
+    /**
+     * {{ method.link }}
+     *
+     * {{ method.description|paramDescription(2)|striptags|raw }}
+     *
+{% for parameter in method.parameters|sortByOptional %}
+     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
+     *        {{ parameter.description|paramDescription(6)|raw }}
+     *
+{% endfor %}
+     * @return mixed
+     */
+    public function {{ method.name }}(
+{% for parameter in method.parameters|sortByOptional %}
+        {% if isValidCodeType(parameter.type) -%} {{ renderType(parameter.type, namespace, false) }} {% endif -%}
+        ${{ parameter.name|camelize }}
+        {%- if not parameter.required %} = null{% endif %}
+        {%- if loop.index < method.parameters|length %},{% endif %}
+
+{% endfor %}
+    )
+    {
+        $requestParameters = [
+{% for parameter in method.parameters %}
+            '{{ parameter.name }}' => ${{ parameter.name|camelize }},
+{% endfor %}
+        ];
+
+        return $this->_apiRequest('{{ method.name }}', $requestParameters);
+    }
+{% endfor %}
+}
