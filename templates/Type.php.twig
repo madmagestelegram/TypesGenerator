@@ -21,6 +21,40 @@ use JMS\Serializer\Annotation\Type;
  */
 class {{ type.name }} extends {{ getClassName(type.parent, namespace) }}
 {
+
+    /**
+     * Returns raw names of properties of this type
+     *
+     * @return string[]
+     */
+    public static function _getPropertyNames(): array
+    {
+        return [
+{% for field in type.fields %}
+            '{{ field.name }}',
+{% endfor %}
+        ];
+    }
+
+    /**
+     * Returns associative array of raw data
+     *
+     * @return array
+     */
+    public function _getRawData(): array
+    {
+        $result = [
+{% for field in type.fields %}
+            '{{ field.name }}' => $this->{{ ('get_' ~ field.name)|camelize }}(),
+{% endfor %}
+        ];
+
+        $result = array_filter($result, static function($item){ return $item!==null; });
+        return array_map(static function(&$item){
+            return is_object($item) ? $item->_getRawData():$item;
+        }, $result);
+    }
+
 {% for field in type.fields %}
     /**
      * {{ field.description|striptags }}

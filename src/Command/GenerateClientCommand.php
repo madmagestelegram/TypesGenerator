@@ -59,9 +59,8 @@ class GenerateClientCommand extends ContainerAwareCommand
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputMedia'],
                 'AbstractSimpleClass',
             ], [
-                'AbstractPassportElementError',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractPassportElementError'],
-                'AbstractSimpleClass',
+                'AbstractType',
+                ['namespace' => self::BASE_NAMESPACE_TYPES]
             ],
         ];
 
