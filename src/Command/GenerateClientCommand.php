@@ -1,4 +1,4 @@
-<?php
+<?php declare( strict_types=1 );
 
 namespace MadmagesTelegram\TypesGenerator\Command;
 
@@ -30,7 +30,7 @@ class GenerateClientCommand extends ContainerAwareCommand
         $baseDirTypes = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE_TYPES);
 
         if (
-            (false === is_dir($baseDirTypes))
+            ( is_dir($baseDirTypes) === false )
             && !mkdir($concurrentDirectory = $baseDirTypes, 0777, true)
             && !is_dir($concurrentDirectory)
         ) {
@@ -49,7 +49,6 @@ class GenerateClientCommand extends ContainerAwareCommand
             ], [
                 'AbstractInputFile',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputFile'],
-                'AbstractSimpleClass',
             ], [
                 'AbstractType',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractType'],

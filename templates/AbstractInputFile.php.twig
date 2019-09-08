@@ -1,12 +1,26 @@
-<?php declare(strict_types=1);
+<?php declare( strict_types=1 );
 
 namespace {{ namespace }};
 
-abstract class AbstractInputFile
+class AbstractInputFile
 {
 
+    /** @var resource|string */
+    private $file;
+
     /**
-     * @return resource
+     * @param resource|string $file
      */
-    abstract public function getDescriptor();
+    public function __construct($file)
+    {
+        $this->file = $file;
+    }
+
+    /**
+     * @return resource|string
+     */
+    public function getFile()
+    {
+        return $this->file;
+    }
 }
