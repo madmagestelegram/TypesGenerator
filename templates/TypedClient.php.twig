@@ -67,7 +67,7 @@ abstract class TypedClient {
                 return $i !== null;
         });
         if (empty($requestParams)) {
-            return [];
+            return [[], false];
         }
 
         $withFiles = false;
