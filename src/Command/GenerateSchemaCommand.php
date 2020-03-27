@@ -11,6 +11,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class GenerateSchemaCommand extends ContainerAwareCommand
 {
+
     /** @var string */
     private const BOT_DOCUMENTATION_URL = 'https://core.telegram.org/bots/api';
 
@@ -126,6 +127,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
                     && stripos($pageNode->text(), 'Getting updates') === 0
                 ) {
                     $isStarted = true;
+
                     return;
                 }
 
@@ -157,7 +159,11 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             });
 
         foreach ($tgItems as $itemName => $tgItem) {
-            if (!$tgItem['isType'] || isset(self::ALIAS_TYPES[$itemName]) || in_array($itemName, self::SKIP_TYPES, true)) {
+            if (
+                !$tgItem['isType']
+                || isset(self::ALIAS_TYPES[$itemName])
+                || in_array($itemName, self::SKIP_TYPES, true)
+            ) {
                 continue;
             }
             if (!isset($tgItem['table'])) {
@@ -217,12 +223,15 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
             $parameters = [];
             if (isset($tgItem['table'])) {
-
                 /** @var Crawler $tableNode */
                 $tableNode = $tgItem['table'];
                 $tableType = $this->getTableType($tableNode);
 
-                $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$parameters, $tableType, $itemName) {
+                $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (
+                    &$parameters,
+                    $tableType,
+                    $itemName
+                ) {
                     if (self::TABLE_TYPE_TWO !== $tableType) {
                         throw new ParseError("Unexpected table structure: {$itemName}");
                     }
@@ -293,7 +302,6 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             return array_merge(...$types);
         }
 
-
         if ($text === 'Float' || $text === 'Float number') {
             return [['float', false]];
         }
@@ -333,7 +341,8 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         if (isset(self::ALIAS_TYPES[$text])) {
             return array_map(function ($type) {
                 return [$type, false];
-            }, array_map([$this, 'getClassName'], self::ALIAS_TYPES[$text]));
+            },
+                array_map([$this, 'getClassName'], self::ALIAS_TYPES[$text]));
         }
 
         if ($this->isObject($text)) {
@@ -449,7 +458,10 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             return self::TABLE_TYPE_ONE;
         }
 
-        if (count($tableColumnNames) === 4 && array_diff($tableColumnNames, ['Parameter', 'Type', 'Required', 'Description']) === []) {
+        if (
+            count($tableColumnNames) === 4 && array_diff($tableColumnNames,
+                                                         ['Parameter', 'Type', 'Required', 'Description']) === []
+        ) {
             return self::TABLE_TYPE_TWO;
         }
 

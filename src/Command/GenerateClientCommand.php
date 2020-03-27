@@ -1,4 +1,4 @@
-<?php declare( strict_types=1 );
+<?php declare(strict_types = 1);
 
 namespace MadmagesTelegram\TypesGenerator\Command;
 
@@ -10,7 +10,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class GenerateClientCommand extends ContainerAwareCommand
 {
 
-    public const BASE_NAMESPACE = 'MadmagesTelegram\\Types';
+    public const BASE_NAMESPACE       = 'MadmagesTelegram\\Types';
     public const BASE_NAMESPACE_TYPES = self::BASE_NAMESPACE . '\\Type';
 
     protected function configure(): void
@@ -30,7 +30,7 @@ class GenerateClientCommand extends ContainerAwareCommand
         $baseDirTypes = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE_TYPES);
 
         if (
-            ( is_dir($baseDirTypes) === false )
+            (is_dir($baseDirTypes) === false)
             && !mkdir($concurrentDirectory = $baseDirTypes, 0777, true)
             && !is_dir($concurrentDirectory)
         ) {
@@ -42,24 +42,34 @@ class GenerateClientCommand extends ContainerAwareCommand
                 'AbstractInlineQueryResult',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInlineQueryResult'],
                 'AbstractSimpleClass',
-            ], [
+            ],
+            [
                 'AbstractInputMessageContent',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputMessageContent'],
                 'AbstractSimpleClass',
-            ], [
+            ],
+            [
                 'AbstractInputFile',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputFile'],
-            ], [
+            ],
+            [
                 'AbstractType',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractType'],
                 'AbstractSimpleClass',
-            ], [
+            ],
+            [
                 'AbstractInputMedia',
                 ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputMedia'],
                 'AbstractSimpleClass',
-            ], [
+            ],
+            [
+                'AbstractPassportElementError',
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractPassportElementError'],
+                'AbstractSimpleClass',
+            ],
+            [
                 'AbstractType',
-                ['namespace' => self::BASE_NAMESPACE_TYPES]
+                ['namespace' => self::BASE_NAMESPACE_TYPES],
             ],
         ];
 
@@ -102,7 +112,7 @@ class GenerateClientCommand extends ContainerAwareCommand
         $templateFile = $template ?? $type;
         $filePath = $basePath . "/{$type}.php";
 
-        $content = $this->getContainer()->get('twig')->render("{$templateFile}.php.twig", $data);
+        $content = $this->getContainer()->get('twig')->render("{$templateFile}.twig", $data);
 
         if (file_put_contents($filePath, $content) === false) {
             throw new RuntimeException(sprintf('Failed write to file %s', $filePath));
