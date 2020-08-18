@@ -57,7 +57,7 @@ class {{ type.name }} extends {{ getClassName(type.parent, namespace) }}
 
 {% for field in type.fields %}
     /**
-     * {{ field.description|striptags }}
+     * {{ field.description|paramDescription(2)|striptags|raw }}
      *
      * @var {{ renderType(field.type, namespace, true) }}
 {%- if not field.required -%}|null
@@ -65,7 +65,7 @@ class {{ type.name }} extends {{ getClassName(type.parent, namespace) }}
 {%- endif %}
 
      * @SerializedName("{{ field.name }}")
-     * @Accessor(getter="{{ ('get_' ~ field.name)|camelize }}",setter="{{ ('set' ~ field.name)|camelize }}")
+     * @Accessor(getter="{{ ('get_' ~ field.name)|camelize }}",setter="{{ ('set_' ~ field.name)|camelize }}")
      * @Type("{{ renderJMSType(field.type)|raw }}")
      */
     protected ${{ field.name|camelize }};

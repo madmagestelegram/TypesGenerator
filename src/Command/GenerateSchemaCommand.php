@@ -421,6 +421,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             "/On success, returns an \<em\>(?<array>Array)\<\/em\> of {$href} objects/",
             "/On success, returns a {$href} object\./",
             "/Returns basic information about the bot in form of a {$href} object\./",
+            "/Returns (?<array>Array) of {$href} on success/",
         ];
         $matchedTypes = [];
         foreach ($regexps as $regexp) {

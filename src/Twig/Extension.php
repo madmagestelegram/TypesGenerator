@@ -144,6 +144,7 @@ class Extension extends \Twig_Extension
         $newDescription = '';
         $characterCount = $indentation;
         foreach ($words as $word) {
+            $word = str_replace('@', '@|', $word);
             $characterCount += strlen($word);
             if ($characterCount > 100) {
                 $newDescription .= "\n{$baseIndentation}* " . $word . ' ';
