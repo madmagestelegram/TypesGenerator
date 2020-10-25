@@ -1,31 +1,50 @@
-<?php declare(strict_types = 1);
+<?php declare(strict_types=1);
 
 namespace MadmagesTelegram\TypesGenerator\Command;
 
+use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
 use RuntimeException;
-use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ContainerBagInterface;
+use Twig\Environment;
 
-class GenerateClientCommand extends ContainerAwareCommand
+class GenerateClientCommand extends Command
 {
 
-    public const BASE_NAMESPACE       = 'MadmagesTelegram\\Types';
+    public const BASE_NAMESPACE = 'MadmagesTelegram\\Types';
     public const BASE_NAMESPACE_TYPES = self::BASE_NAMESPACE . '\\Type';
+
+    private ContainerBagInterface $parameterBag;
+    private Environment $twig;
+
+    public function __construct(ContainerBagInterface $parameterBag, Environment $twig)
+    {
+        $this->parameterBag = $parameterBag;
+        parent::__construct();
+        $this->twig = $twig;
+    }
 
     protected function configure(): void
     {
         $this->setName('generate:client');
     }
 
+    /**
+     * @param InputInterface $input
+     * @param OutputInterface $output
+     * @return int|void
+     * @throws \JsonException
+     */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $buildDirSource = $this->getContainer()->getParameter('kernel.root_dir') . '/../build/source/';
+        $buildDirSource = $this->parameterBag->get('kernel.root_dir') . '/../build/source/';
         $jsonPath = $buildDirSource . 'schema.json';
         $schema = file_get_contents($jsonPath);
-        $schema = json_decode($schema, true);
+        $schema = json_decode($schema, true, 512, JSON_THROW_ON_ERROR);
 
-        $buildDir = $this->getContainer()->getParameter('kernel.root_dir') . '/../build';
+        $buildDir = $this->parameterBag->get('kernel.root_dir') . '/../build';
         $baseDir = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE);
         $baseDirTypes = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE_TYPES);
 
@@ -39,32 +58,27 @@ class GenerateClientCommand extends ContainerAwareCommand
 
         $types = [
             [
-                'AbstractInlineQueryResult',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInlineQueryResult'],
+                Classes::INLINE_QUERY_RESULT,
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INLINE_QUERY_RESULT, 'parent' => 'AbstractType'],
                 'AbstractSimpleClass',
             ],
             [
-                'AbstractInputMessageContent',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputMessageContent'],
+                Classes::INPUT_MESSAGE_CONTENT,
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_MESSAGE_CONTENT, 'parent' => 'AbstractType'],
                 'AbstractSimpleClass',
             ],
             [
-                'AbstractInputFile',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputFile'],
+                Classes::INPUT_FILE,
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_FILE, 'parent' => 'AbstractType'],
             ],
             [
-                'AbstractType',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractType'],
+                Classes::INPUT_MEDIA,
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_MEDIA, 'parent' => 'AbstractType'],
                 'AbstractSimpleClass',
             ],
             [
-                'AbstractInputMedia',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractInputMedia'],
-                'AbstractSimpleClass',
-            ],
-            [
-                'AbstractPassportElementError',
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => 'AbstractPassportElementError'],
+                Classes::PASSPORT_ERROR,
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::PASSPORT_ERROR, 'parent' => 'AbstractType'],
                 'AbstractSimpleClass',
             ],
             [
@@ -97,7 +111,7 @@ class GenerateClientCommand extends ContainerAwareCommand
                 $baseDirTypes,
                 $type['name'],
                 [
-                    'type'      => $type,
+                    'type' => $type,
                     'namespace' => self::BASE_NAMESPACE_TYPES,
                 ],
                 'Type',
@@ -112,7 +126,7 @@ class GenerateClientCommand extends ContainerAwareCommand
         $templateFile = $template ?? $type;
         $filePath = $basePath . "/{$type}.php";
 
-        $content = $this->getContainer()->get('twig')->render("{$templateFile}.twig", $data);
+        $content = $this->twig->render("{$templateFile}.twig", $data);
 
         if (file_put_contents($filePath, $content) === false) {
             throw new RuntimeException(sprintf('Failed write to file %s', $filePath));

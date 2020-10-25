@@ -1,90 +1,37 @@
 <?php
 
+declare(strict_types=1);
+
 namespace MadmagesTelegram\TypesGenerator\Command;
 
+use JsonException;
+use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
+use MadmagesTelegram\TypesGenerator\Dictionary\Types;
 use ParseError;
 use RuntimeException;
-use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
+use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ContainerBagInterface;
 use Symfony\Component\DomCrawler\Crawler;
 
-class GenerateSchemaCommand extends ContainerAwareCommand
+class GenerateSchemaCommand extends Command
 {
 
     /** @var string */
     private const BOT_DOCUMENTATION_URL = 'https://core.telegram.org/bots/api';
 
-    private const ALIAS_TYPES = [
-        'PassportElementError' => [
-            'PassportElementErrorDataField',
-            'PassportElementErrorFrontSide',
-            'PassportElementErrorReverseSide',
-            'PassportElementErrorSelfie',
-            'PassportElementErrorFile',
-            'PassportElementErrorFiles',
-            'PassportElementErrorTranslationFile',
-            'PassportElementErrorTranslationFiles',
-            'PassportElementErrorUnspecified',
-        ],
-        'InputMedia'           => [
-            'InputMediaAnimation',
-            'InputMediaDocument',
-            'InputMediaAudio',
-            'InputMediaPhoto',
-            'InputMediaVideo',
-        ],
-        'InlineQueryResult'    => [
-            'InlineQueryResultCachedAudio',
-            'InlineQueryResultCachedDocument',
-            'InlineQueryResultCachedGif',
-            'InlineQueryResultCachedMpeg4Gif',
-            'InlineQueryResultCachedPhoto',
-            'InlineQueryResultCachedSticker',
-            'InlineQueryResultCachedVideo',
-            'InlineQueryResultCachedVoice',
-            'InlineQueryResultArticle',
-            'InlineQueryResultAudio',
-            'InlineQueryResultContact',
-            'InlineQueryResultGame',
-            'InlineQueryResultDocument',
-            'InlineQueryResultGif',
-            'InlineQueryResultLocation',
-            'InlineQueryResultMpeg4Gif',
-            'InlineQueryResultPhoto',
-            'InlineQueryResultVenue',
-            'InlineQueryResultVideo',
-            'InlineQueryResultVoice',
-        ],
-        'InputMessageContent'  => [
-            'InputTextMessageContent',
-            'InputLocationMessageContent',
-            'InputVenueMessageContent',
-            'InputContactMessageContent',
-        ],
-    ];
-
-    private const PARENT_ALIAS = [
-        'PassportElementError' => 'AbstractPassportElementError',
-        'InputMedia'           => 'AbstractInputMedia',
-        'InlineQueryResult'    => 'AbstractInlineQueryResult',
-        'InputMessageContent'  => 'AbstractInputMessageContent',
-    ];
-
-    private const SKIP_TYPES = [
-        'InputFile',
-        'Sending files',
-        'Inline mode objects',
-        'Formatting options',
-        'Inline mode methods',
-        'CallbackGame',
-    ];
-
     private const TABLE_TYPE_ONE = 1;
     private const TABLE_TYPE_TWO = 2;
 
-    /** @var array */
-    private $schema;
+    private array $schema;
+    private ContainerBagInterface $parameterBag;
+
+    public function __construct(ContainerBagInterface $parameterBag)
+    {
+        $this->parameterBag = $parameterBag;
+        parent::__construct();
+    }
 
     protected function configure(): void
     {
@@ -92,13 +39,14 @@ class GenerateSchemaCommand extends ContainerAwareCommand
     }
 
     /**
-     * @param InputInterface  $input
+     * @param InputInterface $input
      * @param OutputInterface $output
      * @return int|void|null
+     * @throws JsonException
      */
     protected function execute(InputInterface $input, OutputInterface $output)
     {
-        $buildDirSource = $this->getContainer()->getParameter('kernel.root_dir') . '/../build/source/';
+        $buildDirSource = $this->parameterBag->get('kernel.root_dir') . '/../build/source/';
         $htmlPath = $buildDirSource . 'schema.html';
         $jsonPath = $buildDirSource . 'schema.json';
 
@@ -110,7 +58,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         $html = file_get_contents($htmlPath);
 
         $this->schema = [
-            'types'   => [],
+            'types' => [],
             'methods' => [],
         ];
 
@@ -161,11 +109,12 @@ class GenerateSchemaCommand extends ContainerAwareCommand
         foreach ($tgItems as $itemName => $tgItem) {
             if (
                 !$tgItem['isType']
-                || isset(self::ALIAS_TYPES[$itemName])
-                || in_array($itemName, self::SKIP_TYPES, true)
+                || array_key_exists($itemName, Types::ALIAS_TYPES)
+                || in_array($itemName, Types::SKIP_TYPES, true)
             ) {
                 continue;
             }
+
             if (!isset($tgItem['table'])) {
                 throw new ParseError("Expecting table in type description: {$itemName}");
             }
@@ -176,6 +125,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
             $tableType = $this->getTableType($tableNode);
             $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$fields, $tableType) {
+                $required = null;
                 $description = $rowNode->filter('td:nth-child(3)')->text();
                 if ($tableType === self::TABLE_TYPE_ONE) {
                     $required = stripos($description, 'optional') === false;
@@ -185,23 +135,23 @@ class GenerateSchemaCommand extends ContainerAwareCommand
                     $required = stripos($rowNode->filter('td:nth-child(4)')->text(), 'optional') === false;
                 }
 
-                if (!isset($required)) {
+                if ($required === null) {
                     throw new RuntimeException('Expecting $required');
                 }
 
                 $fields[] = [
-                    'name'        => $rowNode->filter('td:nth-child(1)')->text(),
-                    'roughType'   => $rowNode->filter('td:nth-child(2)')->text(),
+                    'name' => $rowNode->filter('td:nth-child(1)')->text(),
+                    'roughType' => $rowNode->filter('td:nth-child(2)')->text(),
                     'description' => $description,
-                    'required'    => $required,
+                    'required' => $required,
                 ];
             });
 
             $this->schema['types'][$itemName] = [
-                'name'         => $itemName,
-                'link'         => $tgItem['link'],
+                'name' => $itemName,
+                'link' => $tgItem['link'],
                 'descriptions' => $tgItem['descriptions'],
-                'fields'       => $fields,
+                'fields' => $fields,
             ];
         }
 
@@ -240,9 +190,9 @@ class GenerateSchemaCommand extends ContainerAwareCommand
                     $textRequired = $rowNode->filter('td:nth-child(3)')->text();
 
                     $parameters[] = [
-                        'name'        => $rowNode->filter('td:nth-child(1)')->text(),
-                        'type'        => $this->parseType($textType),
-                        'required'    => $this->parseRequired($textRequired),
+                        'name' => $rowNode->filter('td:nth-child(1)')->text(),
+                        'type' => $this->parseType($textType),
+                        'required' => $this->parseRequired($textRequired),
                         'description' => $rowNode->filter('td:nth-child(4)')->text(),
                     ];
                 });
@@ -251,35 +201,43 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             $description = implode("\n", $tgItem['descriptions']);
 
             $this->schema['methods'][] = [
-                'name'        => $itemName,
+                'name' => $itemName,
                 'description' => $description,
-                'link'        => $tgItem['link'],
-                'parameters'  => $parameters,
-                'return'      => $this->getReturnType($description),
+                'link' => $tgItem['link'],
+                'parameters' => $parameters,
+                'return' => $this->getReturnType($description),
             ];
         }
 
-        file_put_contents($jsonPath, json_encode($this->schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        file_put_contents($jsonPath, json_encode($this->schema, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         echo realpath($jsonPath);
     }
 
-    private function parseRequired(string $text): bool
+    private function getTableType(Crawler $tableNode): int
     {
-        if (in_array($text, ['Yes', 'True'], true)) {
-            return true;
-        }
-        if (in_array($text, ['Optional', 'No'], true)) {
-            return false;
+        $tableColumnNames = [];
+        $tableNode->filter('thead th')->each(static function (Crawler $colNode) use (&$tableColumnNames) {
+            $tableColumnNames[] = $colNode->text();
+        });
+
+        if (count($tableColumnNames) === 3
+            && array_diff($tableColumnNames, ['Field', 'Type', 'Description']) === []
+        ) {
+            return self::TABLE_TYPE_ONE;
         }
 
-        throw new ParseError('Unexpected required: ' . $text);
+        if (
+            count($tableColumnNames) === 4
+            && array_diff($tableColumnNames, ['Parameter', 'Type', 'Required', 'Description']) === []
+        ) {
+            return self::TABLE_TYPE_TWO;
+        }
+
+        throw new ParseError('Unexpected table type');
     }
 
-    /**
-     * @param $text
-     * @return string|string[]
-     */
-    private function parseType($text)
+
+    private function parseType(string $text)
     {
         if (strpos($text, 'Array of ') !== false) {
             [, $text] = explode(' of ', $text);
@@ -291,7 +249,7 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             return $types;
         }
 
-        if (false !== strpos($text, ' or ') || false !== strpos($text, ' and ')) {
+        if (strpos($text, ' or ') !== false || strpos($text, ' and ') !== false) {
             $divider = strpos($text, ' or ') !== false ? ' or ' : ' and ';
             $pieces = explode($divider, $text);
             $types = [];
@@ -326,23 +284,15 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             return [['string', true]];
         }
 
-        if ($text === 'InputFile') {
-            return [[$this->getClassName('AbstractInputFile'), false]];
+        if (array_key_exists($text, Types::PARENT_ALIAS)) {
+            return [[$this->getClassName(Types::PARENT_ALIAS[$text]), false]];
         }
 
-        if ($text === 'InlineQueryResult') {
-            return [[$this->getClassName('AbstractInlineQueryResult'), false]];
-        }
-
-        if ($text === 'InputMessageContent') {
-            return [[$this->getClassName('AbstractInputMessageContent'), false]];
-        }
-
-        if (isset(self::ALIAS_TYPES[$text])) {
-            return array_map(function ($type) {
-                return [$type, false];
-            },
-                array_map([$this, 'getClassName'], self::ALIAS_TYPES[$text]));
+        if (array_key_exists($text, Types::ALIAS_TYPES)) {
+            return array_map(
+                fn($type) => [$type, false],
+                array_map([$this, 'getClassName'], Types::ALIAS_TYPES[$text])
+            );
         }
 
         if ($this->isObject($text)) {
@@ -372,21 +322,21 @@ class GenerateSchemaCommand extends ContainerAwareCommand
 
     private function getParent(string $type): string
     {
-        if (isset(self::PARENT_ALIAS[$type])) {
-            return $this->getClassName(self::PARENT_ALIAS[$type]);
+        if (array_key_exists($type, Types::PARENT_ALIAS)) {
+            return $this->getClassName(Types::PARENT_ALIAS[$type]);
         }
 
-        foreach (self::ALIAS_TYPES as $aliasName => $aliases) {
-            if (isset(self::PARENT_ALIAS[$aliasName]) && in_array($type, $aliases, true)) {
-                return $this->getClassName(self::PARENT_ALIAS[$aliasName]);
+        foreach (Types::ALIAS_TYPES as $aliasName => $aliases) {
+            if (array_key_exists($aliasName, Types::PARENT_ALIAS) && in_array($type, $aliases, true)) {
+                return $this->getClassName(Types::PARENT_ALIAS[$aliasName]);
             }
         }
 
-        if (0 === strpos($type, 'InlineQueryResult')) {
-            return $this->getClassName('AbstractInlineQueryResult');
+        if (strpos($type, 'InlineQueryResult') === 0) {
+            return $this->getClassName(Classes::INLINE_QUERY_RESULT);
         }
 
-        if (0 === strpos($type, 'Input') && false !== strpos($type, 'MessageContent')) {
+        if (strpos($type, 'Input') === 0 && strpos($type, 'MessageContent') !== false) {
             return $this->getClassName('AbstractInputMessageContent');
         }
 
@@ -394,14 +344,53 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             return $this->getClassName('AbstractType');
         }
 
-        throw new ParseError('Cannot determine parent of type: ' . $type);
+        throw new ParseError("Cannot determine parent of type: {$type}");
     }
 
-    private function getReturnType($description)
+    private function parseRequired(string $text): bool
+    {
+        if (in_array($text, ['Yes', 'True'], true)) {
+            return true;
+        }
+        if (in_array($text, ['Optional', 'No'], true)) {
+            return false;
+        }
+
+        throw new ParseError('Unexpected required: ' . $text);
+    }
+
+    private function getReturnType(string $description): array
+    {
+        $matchedTypes = [];
+        foreach ($this->getRegexps() as $regexp) {
+            if (preg_match($regexp, $description, $match) === 1) {
+                foreach (['objectName', 'simple'] as $matchType) {
+                    if (array_key_exists($matchType, $match)) {
+                        // f**k https://core.telegram.org/bots/api#sendmediagroup
+                        if ($matchType === 'objectName' && strtolower($match['objectName']) !== strtolower($match['objectAnchor'])) {
+                            $matchType = 'objectAnchor';
+                        }
+                        foreach ($this->parseType(ucfirst($match[$matchType])) as $type) {
+                            $type[1] = array_key_exists('array', $match);
+                            $matchedTypes[] = $type;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (count($matchedTypes) === 0) {
+            throw new RuntimeException('return type does not found');
+        }
+
+        return $matchedTypes;
+    }
+
+    private function getRegexps(): array
     {
         $href = '\<a href\=\".*?\#(?<objectAnchor>.*?)\"\>(?<objectName>.*?)\<\/a\>';
         $em = '\<em\>(?<simple>.*?)\<\/em\>';
-        $regexps = [
+        return [
             "/An (?<array>Array) of {$href} objects is returned/",
             "/Returns {$em} on success/",
             "/Returns the new invite link as {$em} on success/",
@@ -423,50 +412,6 @@ class GenerateSchemaCommand extends ContainerAwareCommand
             "/Returns basic information about the bot in form of a {$href} object\./",
             "/Returns (?<array>Array) of {$href} on success/",
         ];
-        $matchedTypes = [];
-        foreach ($regexps as $regexp) {
-            if (preg_match($regexp, $description, $match)) {
-                foreach (['objectName', 'simple'] as $matchType) {
-                    if (isset($match[$matchType])) {
-                        // f**k https://core.telegram.org/bots/api#sendmediagroup
-                        if ($matchType === 'objectName' && strtolower($match['objectName']) !== strtolower($match['objectAnchor'])) {
-                            $matchType = 'objectAnchor';
-                        }
-                        foreach ($this->parseType(ucfirst($match[$matchType])) as $type) {
-                            $type[1] = isset($match['array']);
-                            $matchedTypes[] = $type;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (count($matchedTypes) === 0) {
-            throw new RuntimeException('return type does not found');
-        }
-
-        return $matchedTypes;
-    }
-
-    private function getTableType(Crawler $tableNode): int
-    {
-        $tableColumnNames = [];
-        $tableNode->filter('thead th')->each(static function (Crawler $colNode) use (&$tableColumnNames) {
-            $tableColumnNames[] = $colNode->text();
-        });
-
-        if (count($tableColumnNames) === 3 && array_diff($tableColumnNames, ['Field', 'Type', 'Description']) === []) {
-            return self::TABLE_TYPE_ONE;
-        }
-
-        if (
-            count($tableColumnNames) === 4 && array_diff($tableColumnNames,
-                                                         ['Parameter', 'Type', 'Required', 'Description']) === []
-        ) {
-            return self::TABLE_TYPE_TWO;
-        }
-
-        throw new ParseError('Unexpected table type');
     }
 
 }

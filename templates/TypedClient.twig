@@ -22,7 +22,7 @@ abstract class TypedClient {
      * @param bool   $withFiles
      * @return string Returned json string
      */
-    abstract protected function _rawApiCall(string $method, array $parameters, bool $withFiles = false): string;
+    abstract public function _apiCall(string $method, array $parameters): string;
 
     /**
      * @return SerializerInterface
@@ -48,7 +48,7 @@ abstract class TypedClient {
      */
     private function _requestWithMap(string $method, array $requestParams, array $returnType)
     {
-        $jsonString = $this->_rawApiCall($method, ...$this->_prepareRequest($requestParams));
+        $jsonString = $this->_apiCall($method, $this->_prepareRequest($requestParams));
         if (empty($returnType)) {
             return json_decode($jsonString, true);
         }
@@ -62,34 +62,28 @@ abstract class TypedClient {
 
     private function _prepareRequest(array $requestParams): array
     {
-        $requestParams = array_filter($requestParams, static function($i)
-        {
-                return $i !== null;
-        });
+        $requestParams = array_filter($requestParams);
         if (empty($requestParams)) {
-            return [[], false];
+            return [];
         }
 
-        $withFiles = false;
-        array_walk_recursive($requestParams, function(&$item) use (&$withFiles)
+        array_walk_recursive($requestParams, function(&$item)
         {
             if (!is_object($item)) {
                 return;
             }
 
             if ($item instanceof AbstractInputFile) {
-                $withFiles = true;
-                $file = $item->getFile();
-                if (!is_resource($file) && is_file($file)) {
-                    $file = fopen($file, 'rb');
+                $item = $item->getFile();
+                if (!is_resource($item) && is_file($item)) {
+                    $item = fopen($item, 'rb');
                 }
-                $item = $file;
             } else {
                 $item = json_decode($this->_getSerializer()->serialize($item, 'json'), true);
             }
         });
 
-        return [$requestParams, $withFiles];
+        return $requestParams;
     }
 
     public static function deserialize(string $jsonString, string $type)

@@ -1,16 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace MadmagesTelegram\TypesGenerator\Twig;
 
+use Closure;
+use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
 use RuntimeException;
 use Symfony\Component\Serializer\NameConverter\CamelCaseToSnakeCaseNameConverter;
+use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
+use Twig\TwigFunction;
 
-class Extension extends \Twig_Extension
+class Extension extends AbstractExtension
 {
     /**
      * @var CamelCaseToSnakeCaseNameConverter
      */
-    private $converter;
+    private CamelCaseToSnakeCaseNameConverter $converter;
 
     /**
      * Extension constructor.
@@ -23,27 +30,104 @@ class Extension extends \Twig_Extension
     public function getFilters(): array
     {
         return [
-            new \Twig_Filter('camelize', [$this, 'camelize']),
-            new \Twig_Filter('paramDescription', [$this, 'paramDescription']),
-            new \Twig_Filter('sortByOptional', [$this, 'sortByOptional']),
+            new TwigFilter('camelize', [$this, 'camelize']),
+            new TwigFilter('paramDescription', [$this, 'paramDescription']),
+            new TwigFilter('sortByOptional', [$this, 'sortByOptional']),
         ];
     }
 
-    public function getFunctions()
+    public function getFunctions(): array
     {
         return [
-            new \Twig_Function('renderType', function (array $types, string $namespace, bool $isForDoc) {
+            new TwigFunction('renderType', function (array $types, string $namespace, bool $isForDoc) {
                 return $this->getRenderedType($types, $namespace, $isForDoc);
-            }), new \Twig_Function('isValidCodeType', function (array $type) {
-                return $this->getRenderedType($type, '', false) !== null;
-            }), new \Twig_Function('getClassName', function (string $class, string $namespace) {
-                return $this->getClassName($class, $namespace);
-            }), new \Twig_Function('renderJMSType', function (array $type) {
-                return $this->renderJMSType($type);
-            }), new \Twig_Function('getJMSReturnType', function (array $type, string $namespace) {
-                return $this->getJMSReturnType($type, $namespace);
             }),
+            new TwigFunction('isValidCodeType', function (array $type) {
+                return $this->getRenderedType($type, '', false) !== null;
+            }),
+            new TwigFunction('getClassName', Closure::fromCallable([$this, 'getClassName'])),
+            new TwigFunction('renderJMSType', Closure::fromCallable([$this, 'renderJMSType'])),
+            new TwigFunction('getJMSReturnType', Closure::fromCallable([$this, 'getJMSReturnType'])),
         ];
+    }
+
+    private function getRenderedType(array $types, string $namespace, bool $isForDoc): ?string
+    {
+        if (!$isForDoc && count($types) > 1) {
+            return null;
+        }
+
+        $compiled = [];
+        foreach ($types as $item) {
+            if (!$this->isSimpleType($item[0])) {
+                $item[0] = $this->getClassName($item[0], $namespace);
+            }
+
+            if (!$isForDoc && $item[1]) {
+                return 'array';
+            }
+
+            $compiled[] = $item[0] . ($item[1] ? '[]' : '');
+        }
+
+        return implode('|', $compiled);
+    }
+
+    private function isSimpleType(string $type): bool
+    {
+        return in_array($type, ['int', 'string', 'float', 'object', 'array', 'bool'], true);
+    }
+
+    private function getClassName(string $typeName, string $namespace, bool $forCode = false)
+    {
+        $typeName = trim($typeName, '\\');
+        $namespace = trim($namespace, '\\');
+
+        $shortClassName = str_replace("{$namespace}\\", '', $typeName);
+        if ($forCode) {
+            return "{$shortClassName}::class";
+        }
+
+        return $shortClassName;
+    }
+
+    public function camelize($string)
+    {
+        return $this->converter->denormalize($string);
+    }
+
+    public function paramDescription($description, $indentation, $baseIndentation = '     '): string
+    {
+        $paragraphs = explode("\n", $description);
+        $words = [];
+        foreach ($paragraphs as $paragraph) {
+            $words[] = explode(' ', $paragraph);
+        }
+        $words = array_merge(...$words);
+
+        $newDescription = '';
+        $characterCount = $indentation;
+        foreach ($words as $word) {
+            $word = str_replace('@', '@|', $word);
+            $characterCount += strlen($word);
+            if ($characterCount > 100) {
+                $newDescription .= "\n{$baseIndentation}* " . $word . ' ';
+                $characterCount = $indentation;
+            } else {
+                $newDescription .= $word . ' ';
+            }
+        }
+
+        return $newDescription;
+    }
+
+    public function sortByOptional(array $parameters): array
+    {
+        usort($parameters, static function (array $a, array $b) {
+            return $b['required'] - $a['required'];
+        });
+
+        return $parameters;
     }
 
     private function getJMSReturnType(array $types, string $namespace): array
@@ -73,7 +157,7 @@ class Extension extends \Twig_Extension
     private function renderJMSType(array $types): string
     {
         if (count($types) > 1) {
-            if (count($types) === 2 && strpos($types[0][0], 'AbstractInputFile') !== false) {
+            if (count($types) === 2 && strpos($types[0][0], Classes::INPUT_FILE) !== false) {
                 return 'string';
             }
 
@@ -86,83 +170,5 @@ class Extension extends \Twig_Extension
         }
 
         return $type;
-    }
-
-    private function getRenderedType(array $types, string $namespace, bool $isForDoc): ?string
-    {
-        if (!$isForDoc && count($types) > 1) {
-            return null;
-        }
-
-        $compiled = [];
-        foreach ($types as $item) {
-            if (!$this->isSimpleType($item[0])) {
-                $item[0] = $this->getClassName($item[0], $namespace);
-            }
-
-            if (!$isForDoc && $item[1]) {
-                return 'array';
-            }
-
-            $compiled[] = $item[0] . ($item[1] ? '[]' : '');
-        }
-
-        return implode('|', $compiled);
-    }
-
-    private function getClassName(string $typeName, string $namespace, bool $forCode = false)
-    {
-        $typeName = trim($typeName, '\\');
-        $namespace = trim($namespace, '\\');
-
-        $shortClassName = str_replace("{$namespace}\\", '', $typeName);
-        if ($forCode) {
-            return "{$shortClassName}::class";
-        }
-
-        return $shortClassName;
-    }
-
-    private function isSimpleType(string $type): bool
-    {
-        return in_array($type, ['int', 'string', 'float', 'object', 'array', 'bool'], true);
-    }
-
-    public function camelize($string)
-    {
-        return $this->converter->denormalize($string);
-    }
-
-    public function paramDescription($description, $indentation, $baseIndentation = '     ')
-    {
-        $paragraphs = explode("\n", $description);
-        $words = [];
-        foreach ($paragraphs as $paragraph) {
-            $words = array_merge($words, explode(' ', $paragraph));
-        }
-
-        $newDescription = '';
-        $characterCount = $indentation;
-        foreach ($words as $word) {
-            $word = str_replace('@', '@|', $word);
-            $characterCount += strlen($word);
-            if ($characterCount > 100) {
-                $newDescription .= "\n{$baseIndentation}* " . $word . ' ';
-                $characterCount = $indentation;
-            } else {
-                $newDescription .= $word . ' ';
-            }
-        }
-
-        return $newDescription;
-    }
-
-    public function sortByOptional($parameters)
-    {
-        usort($parameters, function ($a, $b) {
-            return $b['required'] - $a['required'];
-        });
-
-        return $parameters;
     }
 }

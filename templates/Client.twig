@@ -11,7 +11,7 @@ abstract class Client {
      * @param array  $parameters
      * @return mixed
      */
-    abstract public function _rawApiCall(string $method, array $parameters);
+    abstract public function _apiCall(string $method, array $parameters);
 
 {% for method in schema.methods %}
 
@@ -43,7 +43,7 @@ abstract class Client {
 {% endfor %}
         ];
 
-        return $this->_rawApiCall('{{ method.name }}', $requestParameters);
+        return $this->_apiCall('{{ method.name }}', $requestParameters);
     }
 {% endfor %}
 }
