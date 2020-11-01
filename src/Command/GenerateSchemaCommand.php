@@ -151,6 +151,8 @@ class GenerateSchemaCommand extends Command
         foreach ($this->schema['types'] as $typeIndex => $type) {
             foreach ($this->schema['types'][$typeIndex]['fields'] as $fieldIndex => $field) {
                 $this->schema['types'][$typeIndex]['fields'][$fieldIndex]['type'] = $this->parseType($field['rawType']);
+                $this->schema['types'][$typeIndex]['fields'][$fieldIndex]['restrictions'] = $this->getRestrictions($field['description']);
+
                 unset($this->schema['types'][$typeIndex]['fields'][$fieldIndex]['rawType']);
             }
             $this->schema['types'][$typeIndex]['parent'] = $this->getParent($type['name']);
@@ -300,6 +302,51 @@ class GenerateSchemaCommand extends Command
         }
 
         throw new ParseError("Undefined type: {$text}");
+    }
+
+    private function getRestrictions(string $text): array
+    {
+        $arrayRegexps = [
+            '/(“(?<enum>\w+)” \([^\(]+\),?\s?)/',
+            '/[Oo]ne of (“(?<enum>\w+)”,?\s?(?:or )?)/',
+        ];
+        $regexps = [
+            '/(?<minLength>\d+)\-(?<maxLength>\d+) characters?/',
+            '/(?<minLength>\d+)\-(?<maxLength>\d+) characters?/',
+        ];
+
+        $restrictions = [
+            'minLength',
+            'maxLength',
+        ];
+        $arrayRestrictions = [
+            'enum'
+        ];
+
+        $result = [];
+        foreach ($regexps as $regexp) {
+            if (preg_match($regexp, $text, $match) === 1) {
+                foreach ($restrictions as $restriction) {
+                    if (array_key_exists($restriction, $match)) {
+                        $result[$restriction] = $match[$restriction];
+                    }
+                }
+            }
+        }
+
+        foreach ($arrayRegexps as $regexp) {
+            $matchText = $text;
+            while (preg_match($regexp, $matchText, $match) === 1) {
+                foreach ($arrayRestrictions as $restriction) {
+                    if (array_key_exists($restriction, $match)) {
+                        $result[$restriction][] = $match[$restriction];
+                    }
+                }
+                $matchText = str_replace($match[1], '', $matchText);
+            }
+        }
+
+        return $result;
     }
 
     private function getParent(string $type): string
