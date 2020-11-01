@@ -12,4 +12,6 @@ class Classes
     public const INPUT_MESSAGE_CONTENT = 'AbstractInputMessageContent';
 
     public const INPUT_FILE = 'AbstractInputFile';
+
+    public const ABSTRACT_TYPE = 'AbstractType';
 }

@@ -6,6 +6,7 @@ namespace MadmagesTelegram\TypesGenerator\Command;
 
 use JsonException;
 use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
+use MadmagesTelegram\TypesGenerator\Dictionary\Token;
 use MadmagesTelegram\TypesGenerator\Dictionary\Types;
 use ParseError;
 use RuntimeException;
@@ -69,17 +70,14 @@ class GenerateSchemaCommand extends Command
         (new Crawler($html))
             ->filter('#dev_page_content > *')
             ->each(function (Crawler $pageNode) use (&$tgItems, &$methodOrTypeName, &$previousNodeName, &$isStarted) {
-                if (
-                    !$isStarted
-                    && $pageNode->nodeName() === 'h3'
-                    && stripos($pageNode->text(), 'Getting updates') === 0
-                ) {
-                    $isStarted = true;
-
-                    return;
-                }
-
                 if (!$isStarted) {
+                    if (
+                        $pageNode->nodeName() === 'h3'
+                        && stripos($pageNode->text(), 'Getting updates') === 0
+                    ) {
+                        $isStarted = true;
+                    }
+
                     return;
                 }
 
@@ -89,7 +87,10 @@ class GenerateSchemaCommand extends Command
                     $tgItems[$methodOrTypeName]['link'] = $pageNode->filter('a')->attr('href');
                 }
 
-                if (!empty($methodOrTypeName) && in_array($previousNodeName, ['h4', 'p', 'blockquote'], true)) {
+                if (
+                    !empty($methodOrTypeName)
+                    && in_array($previousNodeName, ['h4', 'p', 'blockquote'], true)
+                ) {
                     if ($pageNode->nodeName() === 'p') {
                         $tgItems[$methodOrTypeName]['descriptions'][] = $pageNode->html();
                     }
@@ -125,25 +126,17 @@ class GenerateSchemaCommand extends Command
 
             $tableType = $this->getTableType($tableNode);
             $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$fields, $tableType) {
-                $required = null;
-                $description = $rowNode->filter('td:nth-child(3)')->text();
                 if ($tableType === self::TABLE_TYPE_ONE) {
-                    $required = stripos($description, 'optional') === false;
-                }
-
-                if ($tableType === self::TABLE_TYPE_TWO) {
-                    $required = stripos($rowNode->filter('td:nth-child(4)')->text(), 'optional') === false;
-                }
-
-                if ($required === null) {
-                    throw new RuntimeException('Expecting $required');
+                    $optionalContainer = $rowNode->filter('td:nth-child(3)')->text();
+                } else {
+                    $optionalContainer = $rowNode->filter('td:nth-child(4)')->text();
                 }
 
                 $fields[] = [
                     'name' => $rowNode->filter('td:nth-child(1)')->text(),
-                    'roughType' => $rowNode->filter('td:nth-child(2)')->text(),
-                    'description' => $description,
-                    'required' => $required,
+                    'rawType' => $rowNode->filter('td:nth-child(2)')->text(),
+                    'description' => $rowNode->filter('td:nth-child(3)')->text(),
+                    'required' => stripos($optionalContainer, 'optional') === false,
                 ];
             });
 
@@ -155,16 +148,13 @@ class GenerateSchemaCommand extends Command
             ];
         }
 
-        foreach ($this->schema['types'] as &$type) {
-            foreach ($type['fields'] as &$field) {
-                $field['type'] = $this->parseType($field['roughType']);
-                unset($field['roughType']);
+        foreach ($this->schema['types'] as $typeIndex => $type) {
+            foreach ($this->schema['types'][$typeIndex]['fields'] as $fieldIndex => $field) {
+                $this->schema['types'][$typeIndex]['fields'][$fieldIndex]['type'] = $this->parseType($field['rawType']);
+                unset($this->schema['types'][$typeIndex]['fields'][$fieldIndex]['rawType']);
             }
-            unset($field);
-
-            $type['parent'] = $this->getParent($type['name']);
+            $this->schema['types'][$typeIndex]['parent'] = $this->getParent($type['name']);
         }
-        unset($type);
 
         foreach ($tgItems as $itemName => $tgItem) {
             if ($tgItem['isType']) {
@@ -192,7 +182,7 @@ class GenerateSchemaCommand extends Command
                     $parameters[] = [
                         'name' => $rowNode->filter('td:nth-child(1)')->text(),
                         'type' => $this->parseType($textType),
-                        'required' => $this->parseRequired($textRequired),
+                        'required' => $this->parseIsRequired($textRequired),
                         'description' => $rowNode->filter('td:nth-child(4)')->text(),
                     ];
                 });
@@ -236,14 +226,13 @@ class GenerateSchemaCommand extends Command
         throw new ParseError('Unexpected table type');
     }
 
-
     private function parseType(string $text)
     {
         if (strpos($text, 'Array of ') !== false) {
             [, $text] = explode(' of ', $text);
             $types = $this->parseType($text);
-            foreach ($types as &$type) {
-                $type[1] = true;
+            foreach ($types as $index => $type) {
+                $types[$index]['is_array'] = true;
             }
 
             return $types;
@@ -261,42 +250,35 @@ class GenerateSchemaCommand extends Command
         }
 
         if ($text === 'Float' || $text === 'Float number') {
-            return [['float', false]];
+            return [['type' => 'float', 'is_array' => false]];
         }
 
         if ($text === 'Integer' || $text === 'Int') {
-            return [['int', false]];
+            return [['type' => 'int', 'is_array' => false]];
         }
 
         if ($text === 'True' || $text === 'Boolean') {
-            return [['bool', false]];
+            return [['type' => 'bool', 'is_array' => false]];
         }
 
         if ($text === 'CallbackGame' || $text === 'Array') {
-            return [['array', false]];
+            return [['type' => 'array', 'is_array' => false]];
         }
 
         if ($text === 'String' || $text === 'Integer or String') {
-            return [['string', false]];
+            return [['type' => 'string', 'is_array' => false]];
         }
 
         if ($text === 'Array of String') {
-            return [['string', true]];
+            return [['type' => 'string', 'is_array' => false]];
         }
 
         if (array_key_exists($text, Types::PARENT_ALIAS)) {
-            return [[$this->getClassName(Types::PARENT_ALIAS[$text]), false]];
-        }
-
-        if (array_key_exists($text, Types::ALIAS_TYPES)) {
-            return array_map(
-                fn($type) => [$type, false],
-                array_map([$this, 'getClassName'], Types::ALIAS_TYPES[$text])
-            );
+            return [['type' => $this->getClassName(Types::PARENT_ALIAS[$text]), 'is_array' => false]];
         }
 
         if ($this->isObject($text)) {
-            return [[$this->getClassName($text), false]];
+            return [['type' => $this->getClassName($text), 'is_array' => false]];
         }
 
         throw new ParseError("Unexpected type: {$text}");
@@ -327,7 +309,10 @@ class GenerateSchemaCommand extends Command
         }
 
         foreach (Types::ALIAS_TYPES as $aliasName => $aliases) {
-            if (array_key_exists($aliasName, Types::PARENT_ALIAS) && in_array($type, $aliases, true)) {
+            if (
+                array_key_exists($aliasName, Types::PARENT_ALIAS)
+                && in_array($type, $aliases, true)
+            ) {
                 return $this->getClassName(Types::PARENT_ALIAS[$aliasName]);
             }
         }
@@ -337,26 +322,27 @@ class GenerateSchemaCommand extends Command
         }
 
         if (strpos($type, 'Input') === 0 && strpos($type, 'MessageContent') !== false) {
-            return $this->getClassName('AbstractInputMessageContent');
+            return $this->getClassName(Classes::INPUT_MESSAGE_CONTENT);
         }
 
         if (ctype_upper($type[0])) {
-            return $this->getClassName('AbstractType');
+            return $this->getClassName(Classes::ABSTRACT_TYPE);
         }
 
         throw new ParseError("Cannot determine parent of type: {$type}");
     }
 
-    private function parseRequired(string $text): bool
+    private function parseIsRequired(string $text): bool
     {
-        if (in_array($text, ['Yes', 'True'], true)) {
+        $text = strtolower($text);
+        if (in_array($text, [Token::YES, Token::TRUE], true)) {
             return true;
         }
-        if (in_array($text, ['Optional', 'No'], true)) {
+        if (in_array($text, [Token::OPTIONAL, Token::NO], true)) {
             return false;
         }
 
-        throw new ParseError('Unexpected required: ' . $text);
+        throw new ParseError("Unexpected required: {$text}");
     }
 
     private function getReturnType(string $description): array
@@ -371,7 +357,7 @@ class GenerateSchemaCommand extends Command
                             $matchType = 'objectAnchor';
                         }
                         foreach ($this->parseType(ucfirst($match[$matchType])) as $type) {
-                            $type[1] = array_key_exists('array', $match);
+                            $type['is_array'] = array_key_exists('array', $match);
                             $matchedTypes[] = $type;
                         }
                     }

@@ -59,30 +59,30 @@ class GenerateClientCommand extends Command
         $types = [
             [
                 Classes::INLINE_QUERY_RESULT,
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INLINE_QUERY_RESULT, 'parent' => 'AbstractType'],
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INLINE_QUERY_RESULT, 'parent' => Classes::ABSTRACT_TYPE],
                 'AbstractSimpleClass',
             ],
             [
                 Classes::INPUT_MESSAGE_CONTENT,
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_MESSAGE_CONTENT, 'parent' => 'AbstractType'],
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_MESSAGE_CONTENT, 'parent' => Classes::ABSTRACT_TYPE],
                 'AbstractSimpleClass',
             ],
             [
                 Classes::INPUT_FILE,
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_FILE, 'parent' => 'AbstractType'],
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_FILE, 'parent' => Classes::ABSTRACT_TYPE],
             ],
             [
                 Classes::INPUT_MEDIA,
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_MEDIA, 'parent' => 'AbstractType'],
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::INPUT_MEDIA, 'parent' => Classes::ABSTRACT_TYPE],
                 'AbstractSimpleClass',
             ],
             [
                 Classes::PASSPORT_ERROR,
-                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::PASSPORT_ERROR, 'parent' => 'AbstractType'],
+                ['namespace' => self::BASE_NAMESPACE_TYPES, 'class' => Classes::PASSPORT_ERROR, 'parent' => Classes::ABSTRACT_TYPE],
                 'AbstractSimpleClass',
             ],
             [
-                'AbstractType',
+                Classes::ABSTRACT_TYPE,
                 ['namespace' => self::BASE_NAMESPACE_TYPES],
             ],
         ];

@@ -59,15 +59,15 @@ class Extension extends AbstractExtension
 
         $compiled = [];
         foreach ($types as $item) {
-            if (!$this->isSimpleType($item[0])) {
-                $item[0] = $this->getClassName($item[0], $namespace);
+            if (!$this->isSimpleType($item['type'])) {
+                $item['type'] = $this->getClassName($item['type'], $namespace);
             }
 
-            if (!$isForDoc && $item[1]) {
+            if (!$isForDoc && $item['is_array']) {
                 return 'array';
             }
 
-            $compiled[] = $item[0] . ($item[1] ? '[]' : '');
+            $compiled[] = $item['type'] . ($item['is_array'] ? '[]' : '');
         }
 
         return implode('|', $compiled);
@@ -134,16 +134,16 @@ class Extension extends AbstractExtension
     {
         $result = [];
         foreach ($types as $type) {
-            $resultItem = $type[0];
+            $resultItem = $type['type'];
             if ($this->isSimpleType($resultItem)) {
-                if ($type[1]) {
+                if ($type['is_array']) {
                     $result[] = "'array<{$resultItem}>'";
                 } else {
                     $result[] = "'{$resultItem}'";
                 }
             } else {
                 $resultItem = $this->getClassName($resultItem, $namespace, true);
-                if ($type[1]) {
+                if ($type['is_array']) {
                     $result[] = "'array<' . {$resultItem} . '>'";
                 } else {
                     $result[] = $resultItem;
@@ -157,15 +157,15 @@ class Extension extends AbstractExtension
     private function renderJMSType(array $types): string
     {
         if (count($types) > 1) {
-            if (count($types) === 2 && strpos($types[0][0], Classes::INPUT_FILE) !== false) {
+            if (count($types) === 2 && strpos($types[0]['type'], Classes::INPUT_FILE) !== false) {
                 return 'string';
             }
 
             throw new RuntimeException('Unreachable JMS type');
         }
 
-        $type = trim($types[0][0], '\\');
-        if ($types[0][1]) {
+        $type = trim($types[0]['type'], '\\');
+        if ($types[0]["is_array"]) {
             return "array<{$type}>";
         }
 
