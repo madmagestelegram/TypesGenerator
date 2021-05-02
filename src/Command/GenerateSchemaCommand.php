@@ -116,29 +116,27 @@ class GenerateSchemaCommand extends Command
                 continue;
             }
 
-            if (!isset($tgItem['table'])) {
-                throw new ParseError("Expecting table in type description: {$itemName}");
-            }
-
             $fields = [];
-            /** @var Crawler $tableNode */
-            $tableNode = $tgItem['table'];
+            if (isset($tgItem['table'])) {
+                /** @var Crawler $tableNode */
+                $tableNode = $tgItem['table'];
 
-            $tableType = $this->getTableType($tableNode);
-            $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$fields, $tableType) {
-                if ($tableType === self::TABLE_TYPE_ONE) {
-                    $optionalContainer = $rowNode->filter('td:nth-child(3)')->text();
-                } else {
-                    $optionalContainer = $rowNode->filter('td:nth-child(4)')->text();
-                }
+                $tableType = $this->getTableType($tableNode);
+                $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$fields, $tableType) {
+                    if ($tableType === self::TABLE_TYPE_ONE) {
+                        $optionalContainer = $rowNode->filter('td:nth-child(3)')->text();
+                    } else {
+                        $optionalContainer = $rowNode->filter('td:nth-child(4)')->text();
+                    }
 
-                $fields[] = [
-                    'name' => $rowNode->filter('td:nth-child(1)')->text(),
-                    'rawType' => $rowNode->filter('td:nth-child(2)')->text(),
-                    'description' => $rowNode->filter('td:nth-child(3)')->text(),
-                    'required' => stripos($optionalContainer, 'optional') === false,
-                ];
-            });
+                    $fields[] = [
+                        'name' => $rowNode->filter('td:nth-child(1)')->text(),
+                        'rawType' => $rowNode->filter('td:nth-child(2)')->text(),
+                        'description' => $rowNode->filter('td:nth-child(3)')->text(),
+                        'required' => stripos($optionalContainer, 'optional') === false,
+                    ];
+                });
+            }
 
             $this->schema['types'][$itemName] = [
                 'name' => $itemName,
@@ -243,6 +241,8 @@ class GenerateSchemaCommand extends Command
         if (strpos($text, ' or ') !== false || strpos($text, ' and ') !== false) {
             $divider = strpos($text, ' or ') !== false ? ' or ' : ' and ';
             $pieces = explode($divider, $text);
+            $pieces = array_merge(... array_map(fn(string $item) => explode(',', $item), $pieces));
+            $pieces = array_map(fn(string $item) => trim($item), $pieces);
             $types = [];
             foreach ($pieces as $piece) {
                 $types[] = $this->parseType($piece);
@@ -444,6 +444,10 @@ class GenerateSchemaCommand extends Command
             "/On success, returns a {$href} object\./",
             "/Returns basic information about the bot in form of a {$href} object\./",
             "/Returns (?<array>Array) of {$href} on success/",
+            "/Returns the {$href} of the sent message on success/",
+            "/On success, an (?<array>array) of {$href} that were sent is returned/",
+            "/On success, if the edited message is not an inline message, the edited {$href} is returned, otherwise {$em} is returned/",
+            "/invite link as (?:a )?{$href} object/",
         ];
     }
 
