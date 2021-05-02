@@ -165,7 +165,7 @@ class Extension extends AbstractExtension
         }
 
         $type = trim($types[0]['type'], '\\');
-        if ($types[0]["is_array"]) {
+        if ($types[0]['is_array']) {
             return "array<{$type}>";
         }
 

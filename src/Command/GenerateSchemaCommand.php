@@ -140,7 +140,7 @@ class GenerateSchemaCommand extends Command
 
             $this->schema['types'][$itemName] = [
                 'name' => $itemName,
-                'link' => $tgItem['link'],
+                'link' => $this->makeLinkForSchema($tgItem['link']),
                 'descriptions' => $tgItem['descriptions'],
                 'fields' => $fields,
             ];
@@ -193,7 +193,7 @@ class GenerateSchemaCommand extends Command
             $this->schema['methods'][] = [
                 'name' => $itemName,
                 'description' => $description,
-                'link' => $tgItem['link'],
+                'link' => $this->makeLinkForSchema($tgItem['link']),
                 'parameters' => $parameters,
                 'return' => $this->getReturnType($description),
             ];
@@ -224,6 +224,11 @@ class GenerateSchemaCommand extends Command
         }
 
         throw new ParseError('Unexpected table type');
+    }
+
+    private function makeLinkForSchema(string $link): string
+    {
+        return strpos($link, 'https') === false ? self::BOT_DOCUMENTATION_URL . $link : $link;
     }
 
     private function parseType(string $text)
