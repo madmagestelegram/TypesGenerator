@@ -7,6 +7,7 @@ namespace MadmagesTelegram\TypesGenerator\Command;
 use JsonException;
 use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
 use MadmagesTelegram\TypesGenerator\Dictionary\File;
+use MadmagesTelegram\TypesGenerator\Dictionary\Namespaces;
 use MadmagesTelegram\TypesGenerator\Dictionary\Token;
 use MadmagesTelegram\TypesGenerator\Dictionary\Types;
 use MadmagesTelegram\TypesGenerator\Kernel;
@@ -348,7 +349,7 @@ class GenerateSchemaCommand extends Command
 
     private function getClassName(string $className): string
     {
-        return '\\' . GenerateClientCommand::BASE_NAMESPACE_TYPES . '\\' . $className;
+        return '\\' . Namespaces::BASE_NAMESPACE_TYPES . '\\' . $className;
     }
 
     private function isObject(string $text): bool
@@ -367,7 +368,6 @@ class GenerateSchemaCommand extends Command
             '/[Oo]ne of (“(?<enum>\w+)”,?\s?(?:or )?)/',
         ];
         $regexps = [
-            '/(?<minLength>\d+)\-(?<maxLength>\d+) characters?/',
             '/(?<minLength>\d+)\-(?<maxLength>\d+) characters?/',
         ];
 
