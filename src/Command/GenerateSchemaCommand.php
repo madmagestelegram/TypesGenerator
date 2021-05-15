@@ -8,56 +8,103 @@ use JsonException;
 use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
 use MadmagesTelegram\TypesGenerator\Dictionary\Token;
 use MadmagesTelegram\TypesGenerator\Dictionary\Types;
+use MadmagesTelegram\TypesGenerator\Kernel;
 use ParseError;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\ParameterBag\ContainerBagInterface;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\HttpKernel\KernelInterface;
+use function count;
+use function in_array;
 
 class GenerateSchemaCommand extends Command
 {
 
-    /** @var string */
     private const BOT_DOCUMENTATION_URL = 'https://core.telegram.org/bots/api';
 
     private const TABLE_TYPE_ONE = 1;
     private const TABLE_TYPE_TWO = 2;
 
     private array $schema;
-    private ContainerBagInterface $parameterBag;
+    private Kernel $kernel;
 
-    public function __construct(ContainerBagInterface $parameterBag)
+    public function __construct(KernelInterface $kernel)
     {
-        $this->parameterBag = $parameterBag;
         parent::__construct();
+
+        $this->kernel = $kernel;
     }
 
     protected function configure(): void
     {
-        $this->setName('generate:schema');
+        $this
+            ->setName('generate:schema')
+            ->addOption('schema-path', 's', InputOption::VALUE_OPTIONAL, 'Path to html file', 'schema.html')
+            ->addOption('output');
     }
 
     /**
-     * @param InputInterface $input
-     * @param OutputInterface $output
-     * @return int|void|null
      * @throws JsonException
      */
-    protected function execute(InputInterface $input, OutputInterface $output)
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $buildDirSource = $this->parameterBag->get('kernel.root_dir') . '/../build/source/';
+        $buildDirSource = $this->getBuildDirectory();
         $htmlPath = $buildDirSource . 'schema.html';
         $jsonPath = $buildDirSource . 'schema.json';
 
-        if (!file_exists($htmlPath)) {
-            $contents = file_get_contents(self::BOT_DOCUMENTATION_URL);
-            file_put_contents($htmlPath, $contents);
+        if (
+            !is_dir($buildDirSource)
+            && !mkdir($buildDirSource, 0777, true)
+            // Check, is directory created
+            && !is_dir($buildDirSource)
+        ) {
+            throw new RuntimeException("Failed to create build directory: {$buildDirSource}");
         }
 
-        $html = file_get_contents($htmlPath);
+        if (!file_exists($htmlPath)) {
+            $output->writeln("Html file not exists. Downloading from: " . self::BOT_DOCUMENTATION_URL);
+            if (
+                !($contents = file_get_contents(self::BOT_DOCUMENTATION_URL))
+                || file_put_contents($htmlPath, $contents) === false
+            ) {
+                throw new RuntimeException("Failed to download: " . self::BOT_DOCUMENTATION_URL);
+            }
+        } else {
+            $output->writeln("Using existing html: {$htmlPath}");
+        }
 
+        if (($html = file_get_contents($htmlPath)) === false) {
+            throw new RuntimeException("Failed to read html: {$htmlPath}");
+        }
+
+        $output->writeln('Building schema...');
+        $this->buildSchema($html);
+
+        $output->writeln('Writing...');
+        if (
+            file_put_contents(
+                $jsonPath,
+                json_encode($this->schema, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+            ) === false
+        ) {
+            throw new RuntimeException("Failed to write schema: {$jsonPath}");
+        }
+
+        $output->writeln("Done: {$jsonPath}");
+
+        return 0;
+    }
+
+    private function getBuildDirectory(): string
+    {
+        return realpath($this->kernel->getProjectDir() . '/var/build/') . DIRECTORY_SEPARATOR;
+    }
+
+    private function buildSchema($html): void
+    {
         $this->schema = [
             'types' => [],
             'methods' => [],
@@ -69,43 +116,45 @@ class GenerateSchemaCommand extends Command
         $isStarted = false;
         (new Crawler($html))
             ->filter('#dev_page_content > *')
-            ->each(function (Crawler $pageNode) use (&$tgItems, &$methodOrTypeName, &$previousNodeName, &$isStarted) {
-                if (!$isStarted) {
-                    if (
-                        $pageNode->nodeName() === 'h3'
-                        && stripos($pageNode->text(), 'Getting updates') === 0
-                    ) {
-                        $isStarted = true;
-                    }
-
-                    return;
-                }
-
-                if ($pageNode->nodeName() === 'h4') {
-                    $methodOrTypeName = $pageNode->text();
-                    $tgItems[$methodOrTypeName]['isType'] = ctype_upper($methodOrTypeName[0]);
-                    $tgItems[$methodOrTypeName]['link'] = $pageNode->filter('a')->attr('href');
-                }
-
-                if (
-                    !empty($methodOrTypeName)
-                    && in_array($previousNodeName, ['h4', 'p', 'blockquote'], true)
-                ) {
-                    if ($pageNode->nodeName() === 'p') {
-                        $tgItems[$methodOrTypeName]['descriptions'][] = $pageNode->html();
-                    }
-
-                    if ($pageNode->nodeName() === 'table' && $pageNode->attr('class') === 'table') {
-                        if (isset($tgItems[$methodOrTypeName]['table'])) {
-                            throw new ParseError('Expecting just one table after type name');
+            ->each(
+                function (Crawler $pageNode) use (&$tgItems, &$methodOrTypeName, &$previousNodeName, &$isStarted) {
+                    if (!$isStarted) {
+                        if (
+                            $pageNode->nodeName() === 'h3'
+                            && stripos($pageNode->text(), 'Getting updates') === 0
+                        ) {
+                            $isStarted = true;
                         }
 
-                        $tgItems[$methodOrTypeName]['table'] = $pageNode;
+                        return;
                     }
-                }
 
-                $previousNodeName = $pageNode->nodeName();
-            });
+                    if ($pageNode->nodeName() === 'h4') {
+                        $methodOrTypeName = $pageNode->text();
+                        $tgItems[$methodOrTypeName]['isType'] = ctype_upper($methodOrTypeName[0]);
+                        $tgItems[$methodOrTypeName]['link'] = $pageNode->filter('a')->attr('href');
+                    }
+
+                    if (
+                        !empty($methodOrTypeName)
+                        && in_array($previousNodeName, ['h4', 'p', 'blockquote'], true)
+                    ) {
+                        if ($pageNode->nodeName() === 'p') {
+                            $tgItems[$methodOrTypeName]['descriptions'][] = $pageNode->html();
+                        }
+
+                        if ($pageNode->nodeName() === 'table' && $pageNode->attr('class') === 'table') {
+                            if (isset($tgItems[$methodOrTypeName]['table'])) {
+                                throw new ParseError('Expecting just one table after type name');
+                            }
+
+                            $tgItems[$methodOrTypeName]['table'] = $pageNode;
+                        }
+                    }
+
+                    $previousNodeName = $pageNode->nodeName();
+                }
+            );
 
         foreach ($tgItems as $itemName => $tgItem) {
             if (
@@ -122,20 +171,22 @@ class GenerateSchemaCommand extends Command
                 $tableNode = $tgItem['table'];
 
                 $tableType = $this->getTableType($tableNode);
-                $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (&$fields, $tableType) {
-                    if ($tableType === self::TABLE_TYPE_ONE) {
-                        $optionalContainer = $rowNode->filter('td:nth-child(3)')->text();
-                    } else {
-                        $optionalContainer = $rowNode->filter('td:nth-child(4)')->text();
-                    }
+                $tableNode->filter('tbody tr')->each(
+                    function (Crawler $rowNode) use (&$fields, $tableType) {
+                        if ($tableType === self::TABLE_TYPE_ONE) {
+                            $optionalContainer = $rowNode->filter('td:nth-child(3)')->text();
+                        } else {
+                            $optionalContainer = $rowNode->filter('td:nth-child(4)')->text();
+                        }
 
-                    $fields[] = [
-                        'name' => $rowNode->filter('td:nth-child(1)')->text(),
-                        'rawType' => $rowNode->filter('td:nth-child(2)')->text(),
-                        'description' => $rowNode->filter('td:nth-child(3)')->text(),
-                        'required' => stripos($optionalContainer, 'optional') === false,
-                    ];
-                });
+                        $fields[] = [
+                            'name' => $rowNode->filter('td:nth-child(1)')->text(),
+                            'rawType' => $rowNode->filter('td:nth-child(2)')->text(),
+                            'description' => $rowNode->filter('td:nth-child(3)')->text(),
+                            'required' => stripos($optionalContainer, 'optional') === false,
+                        ];
+                    }
+                );
             }
 
             $this->schema['types'][$itemName] = [
@@ -149,7 +200,9 @@ class GenerateSchemaCommand extends Command
         foreach ($this->schema['types'] as $typeIndex => $type) {
             foreach ($this->schema['types'][$typeIndex]['fields'] as $fieldIndex => $field) {
                 $this->schema['types'][$typeIndex]['fields'][$fieldIndex]['type'] = $this->parseType($field['rawType']);
-                $this->schema['types'][$typeIndex]['fields'][$fieldIndex]['restrictions'] = $this->getRestrictions($field['description']);
+                $this->schema['types'][$typeIndex]['fields'][$fieldIndex]['restrictions'] = $this->getRestrictions(
+                    $field['description']
+                );
 
                 unset($this->schema['types'][$typeIndex]['fields'][$fieldIndex]['rawType']);
             }
@@ -167,25 +220,27 @@ class GenerateSchemaCommand extends Command
                 $tableNode = $tgItem['table'];
                 $tableType = $this->getTableType($tableNode);
 
-                $tableNode->filter('tbody tr')->each(function (Crawler $rowNode) use (
-                    &$parameters,
-                    $tableType,
-                    $itemName
-                ) {
-                    if (self::TABLE_TYPE_TWO !== $tableType) {
-                        throw new ParseError("Unexpected table structure: {$itemName}");
+                $tableNode->filter('tbody tr')->each(
+                    function (Crawler $rowNode) use (
+                        &$parameters,
+                        $tableType,
+                        $itemName
+                    ) {
+                        if (self::TABLE_TYPE_TWO !== $tableType) {
+                            throw new ParseError("Unexpected table structure: {$itemName}");
+                        }
+
+                        $textType = $rowNode->filter('td:nth-child(2)')->text();
+                        $textRequired = $rowNode->filter('td:nth-child(3)')->text();
+
+                        $parameters[] = [
+                            'name' => $rowNode->filter('td:nth-child(1)')->text(),
+                            'type' => $this->parseType($textType),
+                            'required' => $this->parseIsRequired($textRequired),
+                            'description' => $rowNode->filter('td:nth-child(4)')->text(),
+                        ];
                     }
-
-                    $textType = $rowNode->filter('td:nth-child(2)')->text();
-                    $textRequired = $rowNode->filter('td:nth-child(3)')->text();
-
-                    $parameters[] = [
-                        'name' => $rowNode->filter('td:nth-child(1)')->text(),
-                        'type' => $this->parseType($textType),
-                        'required' => $this->parseIsRequired($textRequired),
-                        'description' => $rowNode->filter('td:nth-child(4)')->text(),
-                    ];
-                });
+                );
             }
 
             $description = implode("\n", $tgItem['descriptions']);
@@ -198,17 +253,16 @@ class GenerateSchemaCommand extends Command
                 'return' => $this->getReturnType($description),
             ];
         }
-
-        file_put_contents($jsonPath, json_encode($this->schema, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        echo realpath($jsonPath);
     }
 
     private function getTableType(Crawler $tableNode): int
     {
         $tableColumnNames = [];
-        $tableNode->filter('thead th')->each(static function (Crawler $colNode) use (&$tableColumnNames) {
-            $tableColumnNames[] = $colNode->text();
-        });
+        $tableNode->filter('thead th')->each(
+            static function (Crawler $colNode) use (&$tableColumnNames) {
+                $tableColumnNames[] = $colNode->text();
+            }
+        );
 
         if (count($tableColumnNames) === 3
             && array_diff($tableColumnNames, ['Field', 'Type', 'Description']) === []
@@ -223,7 +277,7 @@ class GenerateSchemaCommand extends Command
             return self::TABLE_TYPE_TWO;
         }
 
-        throw new ParseError('Unexpected table type');
+        throw new ParseError("Unexpected table type: \n{$tableNode->html()}");
     }
 
     private function makeLinkForSchema(string $link): string
@@ -231,7 +285,7 @@ class GenerateSchemaCommand extends Command
         return strpos($link, 'https') === false ? self::BOT_DOCUMENTATION_URL . $link : $link;
     }
 
-    private function parseType(string $text)
+    private function parseType(string $text): array
     {
         if (strpos($text, 'Array of ') !== false) {
             [, $text] = explode(' of ', $text);
@@ -246,8 +300,8 @@ class GenerateSchemaCommand extends Command
         if (strpos($text, ' or ') !== false || strpos($text, ' and ') !== false) {
             $divider = strpos($text, ' or ') !== false ? ' or ' : ' and ';
             $pieces = explode($divider, $text);
-            $pieces = array_merge(... array_map(fn(string $item) => explode(',', $item), $pieces));
-            $pieces = array_map(fn(string $item) => trim($item), $pieces);
+            $pieces = array_merge(... array_map(static fn(string $item) => explode(',', $item), $pieces));
+            $pieces = array_map(static fn(string $item) => trim($item), $pieces);
             $types = [];
             foreach ($pieces as $piece) {
                 $types[] = $this->parseType($piece);
@@ -296,10 +350,6 @@ class GenerateSchemaCommand extends Command
         return '\\' . GenerateClientCommand::BASE_NAMESPACE_TYPES . '\\' . $className;
     }
 
-    /**
-     * @param $text
-     * @return bool
-     */
     private function isObject(string $text): bool
     {
         if (isset($this->schema['types'][$text])) {
@@ -325,7 +375,7 @@ class GenerateSchemaCommand extends Command
             'maxLength',
         ];
         $arrayRestrictions = [
-            'enum'
+            'enum',
         ];
 
         $result = [];
@@ -405,9 +455,13 @@ class GenerateSchemaCommand extends Command
                 foreach (['objectName', 'simple'] as $matchType) {
                     if (array_key_exists($matchType, $match)) {
                         // f**k https://core.telegram.org/bots/api#sendmediagroup
-                        if ($matchType === 'objectName' && strtolower($match['objectName']) !== strtolower($match['objectAnchor'])) {
+                        if (
+                            $matchType === 'objectName'
+                            && strtolower($match['objectName']) !== strtolower($match['objectAnchor'])
+                        ) {
                             $matchType = 'objectAnchor';
                         }
+
                         foreach ($this->parseType(ucfirst($match[$matchType])) as $type) {
                             $type['is_array'] = array_key_exists('array', $match);
                             $matchedTypes[] = $type;
@@ -428,6 +482,7 @@ class GenerateSchemaCommand extends Command
     {
         $href = '\<a href\=\".*?\#(?<objectAnchor>.*?)\"\>(?<objectName>.*?)\<\/a\>';
         $em = '\<em\>(?<simple>.*?)\<\/em\>';
+
         return [
             "/An (?<array>Array) of {$href} objects is returned/",
             "/Returns {$em} on success/",
