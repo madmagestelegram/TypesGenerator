@@ -10,4 +10,6 @@ class TemplateFile
     public const TYPED_CLIENT = 'TypedClient';
     public const ABSTRACT_SIMPLE_TYPE = 'AbstractSimpleClass';
     public const CLIENT = 'Client';
+    public const SERIALIZER = 'Serializer';
+    public const SIMPLE_CLASS = 'SimpleClass';
 }

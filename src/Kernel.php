@@ -26,6 +26,9 @@ class Kernel extends BaseKernel
         return dirname(__DIR__) . '/var/log';
     }
 
+    protected function configureRoutes(\Symfony\Component\Routing\Loader\Configurator\RoutingConfigurator $routes): void {
+    }
+
     public function registerBundles()
     {
         $contents = require dirname(__DIR__) . '/config/bundles.php';

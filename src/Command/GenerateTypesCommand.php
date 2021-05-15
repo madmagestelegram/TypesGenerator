@@ -2,6 +2,7 @@
 
 namespace MadmagesTelegram\TypesGenerator\Command;
 
+use Exception;
 use JsonException;
 use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
 use MadmagesTelegram\TypesGenerator\Dictionary\File;
@@ -19,7 +20,7 @@ use Twig\Error\RuntimeError;
 use Twig\Error\SyntaxError;
 use function json_decode;
 
-class GenerateClientCommand extends Command
+class GenerateTypesCommand extends Command
 {
     private Environment $twig;
     private KernelInterface $kernel;
@@ -35,7 +36,7 @@ class GenerateClientCommand extends Command
     protected function configure(): void
     {
         $this
-            ->setName('generate:client')
+            ->setName('generate:types')
             ->addOption(
                 'schema',
                 's',
@@ -71,6 +72,7 @@ class GenerateClientCommand extends Command
 
         [$baseDirectory, $baseDirectoryTypes] = $this->createDirectories($input->getOption('output'));
 
+        $output->writeln("Destination directory: {$baseDirectory}");
         $output->writeln('Generating...');
 
         foreach ($this->getDefaultTypes() as $type) {
@@ -82,6 +84,11 @@ class GenerateClientCommand extends Command
             $this->generate($baseDirectory, ...$type);
         }
         $output->writeln('  -> Default clients');
+
+        foreach ($this->getDefaultUtils() as $type) {
+            $this->generate($baseDirectory, ...$type);
+        }
+        $output->writeln('  -> Utils');
 
         foreach ($schema['types'] as $type) {
             $data = [
@@ -210,11 +217,35 @@ class GenerateClientCommand extends Command
         return [
             [
                 TemplateFile::TYPED_CLIENT,
-                ['namespace' => Namespaces::BASE_NAMESPACE, 'schema' => $schema],
+                [
+                    'namespace' => Namespaces::BASE_NAMESPACE,
+                    'schema' => $schema,
+                    'exception' => Classes::TELEGRAM_EXCEPTION,
+                ],
             ],
             [
                 TemplateFile::CLIENT,
-                ['namespace' => Namespaces::BASE_NAMESPACE, 'schema' => $schema],
+                [
+                    'namespace' => Namespaces::BASE_NAMESPACE,
+                    'schema' => $schema,
+                    'exception' => Classes::TELEGRAM_EXCEPTION,
+                ],
+            ],
+        ];
+    }
+
+    private function getDefaultUtils(): array
+    {
+        return [
+            [TemplateFile::SERIALIZER, ['namespace' => Namespaces::BASE_NAMESPACE]],
+            [
+                Classes::TELEGRAM_EXCEPTION,
+                [
+                    'namespace' => Namespaces::BASE_NAMESPACE,
+                    'class' => Classes::TELEGRAM_EXCEPTION,
+                    'parent' => '\\' . Exception::class,
+                ],
+                TemplateFile::SIMPLE_CLASS,
             ],
         ];
     }

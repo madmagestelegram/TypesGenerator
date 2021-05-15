@@ -14,4 +14,5 @@ class Classes
     public const INPUT_FILE = 'AbstractInputFile';
 
     public const ABSTRACT_TYPE = 'AbstractType';
+    public const TELEGRAM_EXCEPTION = 'TelegramException';
 }

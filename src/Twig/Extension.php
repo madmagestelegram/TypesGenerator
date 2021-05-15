@@ -14,14 +14,9 @@ use Twig\TwigFunction;
 
 class Extension extends AbstractExtension
 {
-    /**
-     * @var CamelCaseToSnakeCaseNameConverter
-     */
+
     private CamelCaseToSnakeCaseNameConverter $converter;
 
-    /**
-     * Extension constructor.
-     */
     public function __construct()
     {
         $this->converter = new CamelCaseToSnakeCaseNameConverter();
@@ -39,12 +34,16 @@ class Extension extends AbstractExtension
     public function getFunctions(): array
     {
         return [
-            new TwigFunction('renderType', function (array $types, string $namespace, bool $isForDoc) {
+            new TwigFunction(
+                'renderType', function (array $types, string $namespace, bool $isForDoc) {
                 return $this->getRenderedType($types, $namespace, $isForDoc);
-            }),
-            new TwigFunction('isValidCodeType', function (array $type) {
+            }
+            ),
+            new TwigFunction(
+                'isValidCodeType', function (array $type) {
                 return $this->getRenderedType($type, '', false) !== null;
-            }),
+            }
+            ),
             new TwigFunction('getClassName', Closure::fromCallable([$this, 'getClassName'])),
             new TwigFunction('renderJMSType', Closure::fromCallable([$this, 'renderJMSType'])),
             new TwigFunction('getJMSReturnType', Closure::fromCallable([$this, 'getJMSReturnType'])),
@@ -54,6 +53,18 @@ class Extension extends AbstractExtension
     private function getRenderedType(array $types, string $namespace, bool $isForDoc): ?string
     {
         if (!$isForDoc && count($types) > 1) {
+            $isAllArrays = true;
+            foreach ($types as $item) {
+                if (!$item['is_array']) {
+                    $isAllArrays = false;
+                    break;
+                }
+            }
+
+            if ($isAllArrays) {
+                return 'array';
+            }
+
             return null;
         }
 
@@ -123,9 +134,12 @@ class Extension extends AbstractExtension
 
     public function sortByOptional(array $parameters): array
     {
-        usort($parameters, static function (array $a, array $b) {
-            return $b['required'] - $a['required'];
-        });
+        usort(
+            $parameters,
+            static function (array $a, array $b) {
+                return $b['required'] - $a['required'];
+            }
+        );
 
         return $parameters;
     }

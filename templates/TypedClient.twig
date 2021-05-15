@@ -2,16 +2,10 @@
 
 namespace {{ namespace }};
 
-use Doctrine\Common\Annotations\AnnotationRegistry;
-use JMS\Serializer\SerializerBuilder;
-use JMS\Serializer\SerializerInterface;
 use MadmagesTelegram\Types\Type\AbstractInputFile;
-use RuntimeException;
+use JsonException;
 
 abstract class TypedClient {
-
-    /** @var SerializerInterface */
-    private static $serializer;
 
     /**
      * Real request engine
@@ -19,47 +13,40 @@ abstract class TypedClient {
      *
      * @param string $method
      * @param array  $parameters
-     * @param bool   $withFiles
      * @return string Returned json string
      */
     abstract public function _apiCall(string $method, array $parameters): string;
-
-    /**
-     * @return SerializerInterface
-     */
-    private static function _getSerializer(): SerializerInterface
-    {
-        if (self::$serializer === null) {
-            if (!class_exists(AnnotationRegistry::class, false)) {
-                AnnotationRegistry::registerLoader('class_exists');
-            }
-
-            self::$serializer = SerializerBuilder::create()->build();
-        }
-
-        return self::$serializer;
-    }
 
     /**
      * @param string $method
      * @param array  $requestParams
      * @param array  $returnType
      * @return mixed
+     * @throws {{ exception }}
      */
     private function _requestWithMap(string $method, array $requestParams, array $returnType)
     {
-        $jsonString = $this->_apiCall($method, $this->_prepareRequest($requestParams));
-        if (empty($returnType)) {
-            return json_decode($jsonString, true);
-        }
-
         if (count($returnType) > 1) {
-            throw new RuntimeException('More than one type not implemented');
+            throw new {{ exception }}('More than one return type is not implemented');
         }
 
-        return self::deserialize($jsonString, $returnType[0]);
+        $responseJson = $this->_apiCall($method, $this->_prepareRequest($requestParams));
+        if (empty($returnType)) {
+            try {
+                return json_decode($responseJson, true, 512, JSON_THROW_ON_ERROR);
+            } catch (JsonException $e) {
+                throw new {{ exception }}($e->getMessage(), $e->getCode(), $e);
+            }
+        }
+
+        return Serializer::deserialize($responseJson, $returnType[0]);
     }
 
+    /**
+     * @param array $requestParams
+     * @return array
+     * @throws {{ exception }}
+     */
     private function _prepareRequest(array $requestParams): array
     {
         $requestParams = array_filter($requestParams);
@@ -67,7 +54,7 @@ abstract class TypedClient {
             return [];
         }
 
-        array_walk_recursive($requestParams, function(&$item)
+        array_walk_recursive($requestParams, static function(&$item)
         {
             if (!is_object($item)) {
                 return;
@@ -75,25 +62,26 @@ abstract class TypedClient {
 
             if ($item instanceof AbstractInputFile) {
                 $item = $item->getFile();
-                if (!is_resource($item) && is_file($item)) {
-                    $item = fopen($item, 'rb');
+                if (!is_resource($item)) {
+                    if (is_file($item)) {
+                        $item = fopen($item, 'rb');
+                        if($item === false) {
+                            throw new TelegramException("Failed to open file: {$item}");
+                        }
+                    } else {
+                        throw new TelegramException("Expecting resource or file path: {$item}");
+                    }
                 }
             } else {
-                $item = json_decode($this->_getSerializer()->serialize($item, 'json'), true);
+                try {
+                    $item = json_decode(Serializer::serialize($item), true, 512, JSON_THROW_ON_ERROR);
+                } catch (JsonException $e) {
+                    throw new {{ exception }}($e->getMessage(), $e->getCode(), $e);
+                }
             }
         });
 
         return $requestParams;
-    }
-
-    public static function deserialize(string $jsonString, string $type)
-    {
-        return self::_getSerializer()->deserialize($jsonString, $type, 'json');
-    }
-
-    public static function serialize(object $objectToSerialize): string
-    {
-        return self::_getSerializer()->serialize($objectToSerialize, 'json');
     }
 
 {% for method in schema.methods %}
@@ -104,11 +92,12 @@ abstract class TypedClient {
      * {{ method.description|paramDescription(2)|striptags|raw }}
      *
 {% for parameter in method.parameters|sortByOptional %}
-     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
+     * @param {{ renderType(parameter.type, namespace, true) }}{%- if not parameter.required %}|null{% endif %} ${{ parameter.name|camelize }}
      *        {{ parameter.description|paramDescription(6)|raw }}
      *
 {% endfor %}
-     * @return {{ renderType(method.return,namespace,true) }};
+     * @return {{ renderType(method.return,namespace,true) }}
+     * @throws {{ exception }}
      */
     public function {{ method.name }}(
 {% for parameter in method.parameters|sortByOptional %}

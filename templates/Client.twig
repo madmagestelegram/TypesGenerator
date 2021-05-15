@@ -21,7 +21,7 @@ abstract class Client {
      * {{ method.description|paramDescription(2)|striptags|raw }}
      *
 {% for parameter in method.parameters|sortByOptional %}
-     * @param {{ renderType(parameter.type, namespace, true) }} ${{ parameter.name|camelize }}
+     * @param {{ renderType(parameter.type, namespace, true) }}{%- if not parameter.required %}|null{% endif %} ${{ parameter.name|camelize }}
      *        {{ parameter.description|paramDescription(6)|raw }}
      *
 {% endfor %}
