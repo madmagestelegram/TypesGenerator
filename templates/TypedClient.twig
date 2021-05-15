@@ -2,7 +2,7 @@
 
 namespace {{ namespace }};
 
-use MadmagesTelegram\Types\Type\AbstractInputFile;
+use MadmagesTelegram\Types\Type\InputFile;
 use JsonException;
 
 abstract class TypedClient {
@@ -60,7 +60,7 @@ abstract class TypedClient {
                 return;
             }
 
-            if ($item instanceof AbstractInputFile) {
+            if ($item instanceof InputFile) {
                 $item = $item->getFile();
                 if (!is_resource($item)) {
                     if (is_file($item)) {
