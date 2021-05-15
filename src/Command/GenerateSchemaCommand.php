@@ -6,6 +6,7 @@ namespace MadmagesTelegram\TypesGenerator\Command;
 
 use JsonException;
 use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
+use MadmagesTelegram\TypesGenerator\Dictionary\File;
 use MadmagesTelegram\TypesGenerator\Dictionary\Token;
 use MadmagesTelegram\TypesGenerator\Dictionary\Types;
 use MadmagesTelegram\TypesGenerator\Kernel;
@@ -52,8 +53,8 @@ class GenerateSchemaCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $buildDirSource = $this->getBuildDirectory();
-        $htmlPath = $buildDirSource . 'schema.html';
-        $jsonPath = $buildDirSource . 'schema.json';
+        $htmlPath = $buildDirSource . File::DEFAULT_HTML_NAME;
+        $schemaPath = $buildDirSource . File::DEFAULT_SCHEMA_NAME;
 
         if (
             !is_dir($buildDirSource)
@@ -86,21 +87,21 @@ class GenerateSchemaCommand extends Command
         $output->writeln('Writing...');
         if (
             file_put_contents(
-                $jsonPath,
+                $schemaPath,
                 json_encode($this->schema, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
             ) === false
         ) {
-            throw new RuntimeException("Failed to write schema: {$jsonPath}");
+            throw new RuntimeException("Failed to write schema: {$schemaPath}");
         }
 
-        $output->writeln("Done: {$jsonPath}");
+        $output->writeln("Done: {$schemaPath}");
 
         return 0;
     }
 
     private function getBuildDirectory(): string
     {
-        return realpath($this->kernel->getProjectDir() . '/var/build/') . DIRECTORY_SEPARATOR;
+        return $this->kernel->getProjectDir() . '/var/build/';
     }
 
     private function buildSchema($html): void

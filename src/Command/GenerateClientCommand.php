@@ -4,11 +4,15 @@ namespace MadmagesTelegram\TypesGenerator\Command;
 
 use JsonException;
 use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
+use MadmagesTelegram\TypesGenerator\Dictionary\File;
+use MadmagesTelegram\TypesGenerator\Dictionary\Namespaces;
+use MadmagesTelegram\TypesGenerator\Dictionary\TemplateFile;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\DependencyInjection\ParameterBag\ContainerBagInterface;
+use Symfony\Component\HttpKernel\KernelInterface;
 use Twig\Environment;
 use Twig\Error\LoaderError;
 use Twig\Error\RuntimeError;
@@ -17,71 +21,145 @@ use function json_decode;
 
 class GenerateClientCommand extends Command
 {
-
-    public const BASE_NAMESPACE = 'MadmagesTelegram\\Types';
-    public const BASE_NAMESPACE_TYPES = self::BASE_NAMESPACE . '\\Type';
-
-    private ContainerBagInterface $parameterBag;
     private Environment $twig;
+    private KernelInterface $kernel;
 
-    public function __construct(ContainerBagInterface $parameterBag, Environment $twig)
+    public function __construct(KernelInterface $kernel, Environment $twig)
     {
-        parent::__construct();
-
-        $this->parameterBag = $parameterBag;
+        $this->kernel = $kernel;
         $this->twig = $twig;
+
+        parent::__construct();
     }
 
     protected function configure(): void
     {
-        $this->setName('generate:client');
+        $this
+            ->setName('generate:client')
+            ->addOption(
+                'schema',
+                's',
+                InputOption::VALUE_OPTIONAL,
+                'Target schema path',
+                $this->getSchemaPath()
+            )
+            ->addOption(
+                'output',
+                'o',
+                InputOption::VALUE_OPTIONAL,
+                'Output directory path',
+                $this->getBuildDirectoryPath()
+            );
+    }
+
+    private function getSchemaPath(): string
+    {
+        return $this->getBuildDirectoryPath() . File::DEFAULT_SCHEMA_NAME;
+    }
+
+    private function getBuildDirectoryPath(): string
+    {
+        return $this->kernel->getProjectDir() . '/var/build/';
     }
 
     /**
      * @throws JsonException
      */
-    protected function execute(InputInterface $input, OutputInterface $output): void
+    protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $buildDirSource = $this->parameterBag->get('kernel.root_dir') . '/../build/source/';
-        $jsonPath = $buildDirSource . 'schema.json';
-        $schema = file_get_contents($jsonPath);
-        $schema = json_decode($schema, true, 512, JSON_THROW_ON_ERROR);
+        $schema = $this->readJsonFile($input->getOption('schema'));
 
-        $buildDir = $this->parameterBag->get('kernel.root_dir') . '/../build';
-        $baseDir = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE);
-        $baseDirTypes = $buildDir . '/' . str_replace('\\', '/', self::BASE_NAMESPACE_TYPES);
+        [$baseDirectory, $baseDirectoryTypes] = $this->createDirectories($input->getOption('output'));
 
-        if (
-            (is_dir($baseDirTypes) === false)
-            && !mkdir($concurrentDirectory = $baseDirTypes, 0777, true)
-            && !is_dir($concurrentDirectory)
-        ) {
-            throw new RuntimeException("Directory {$concurrentDirectory} was not created");
+        $output->writeln('Generating...');
+
+        foreach ($this->getDefaultTypes() as $type) {
+            $this->generate($baseDirectoryTypes, ...$type);
+        }
+        $output->writeln('  -> Default types');
+
+        foreach ($this->getDefaultClients($schema) as $type) {
+            $this->generate($baseDirectory, ...$type);
+        }
+        $output->writeln('  -> Default clients');
+
+        foreach ($schema['types'] as $type) {
+            $data = [
+                $baseDirectoryTypes,
+                $type['name'],
+                [
+                    'type' => $type,
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
+                ],
+                'Type',
+            ];
+
+            $this->generate(...$data);
+        }
+        $output->writeln("  -> Types: " . count($schema['types']));
+
+        return 0;
+    }
+
+    /**
+     * @throws JsonException
+     */
+    private function readJsonFile(string $jsonFilePath): array
+    {
+        if (!is_file($jsonFilePath)) {
+            throw new RuntimeException("File not exists: {$jsonFilePath}");
         }
 
-        $types = [
+        $jsonString = file_get_contents($jsonFilePath);
+        if ($jsonString === false) {
+            throw new RuntimeException("Failed to read file: {$jsonFilePath}");
+        }
+
+        return json_decode($jsonString, true, 512, JSON_THROW_ON_ERROR);
+    }
+
+    private function createDirectories(string $root): array
+    {
+        $buildDirectory = rtrim($root, '/');
+        $baseDir = $buildDirectory . '/' . str_replace('\\', '/', Namespaces::BASE_NAMESPACE);
+        $baseDirTypes = $buildDirectory . '/' . str_replace('\\', '/', Namespaces::BASE_NAMESPACE_TYPES);
+
+        if (
+            is_dir($baseDirTypes) === false
+            && !mkdir($baseDirTypes, 0777, true)
+            && !is_dir($baseDirTypes)
+        ) {
+            throw new RuntimeException("Can`t create directory: {$baseDirTypes}");
+        }
+
+        return [$baseDir, $baseDirTypes];
+    }
+
+    private function getDefaultTypes(): array
+    {
+        return [
             [
                 Classes::INLINE_QUERY_RESULT,
                 [
-                    'namespace' => self::BASE_NAMESPACE_TYPES,
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
                     'class' => Classes::INLINE_QUERY_RESULT,
                     'parent' => Classes::ABSTRACT_TYPE,
                 ],
-                'AbstractSimpleClass',
+                TemplateFile::ABSTRACT_SIMPLE_TYPE,
             ],
             [
                 Classes::INPUT_MESSAGE_CONTENT,
                 [
-                    'namespace' => self::BASE_NAMESPACE_TYPES,
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
                     'class' => Classes::INPUT_MESSAGE_CONTENT,
                     'parent' => Classes::ABSTRACT_TYPE,
                 ],
-                'AbstractSimpleClass',
+                TemplateFile::ABSTRACT_SIMPLE_TYPE,
             ],
             [
                 Classes::INPUT_FILE,
                 [
-                    'namespace' => self::BASE_NAMESPACE_TYPES,
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
                     'class' => Classes::INPUT_FILE,
                     'parent' => Classes::ABSTRACT_TYPE,
                 ],
@@ -89,64 +167,31 @@ class GenerateClientCommand extends Command
             [
                 Classes::INPUT_MEDIA,
                 [
-                    'namespace' => self::BASE_NAMESPACE_TYPES,
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
                     'class' => Classes::INPUT_MEDIA,
                     'parent' => Classes::ABSTRACT_TYPE,
                 ],
-                'AbstractSimpleClass',
+                TemplateFile::ABSTRACT_SIMPLE_TYPE,
             ],
             [
                 Classes::PASSPORT_ERROR,
                 [
-                    'namespace' => self::BASE_NAMESPACE_TYPES,
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
                     'class' => Classes::PASSPORT_ERROR,
                     'parent' => Classes::ABSTRACT_TYPE,
                 ],
-                'AbstractSimpleClass',
+                TemplateFile::ABSTRACT_SIMPLE_TYPE,
             ],
             [
                 Classes::ABSTRACT_TYPE,
-                ['namespace' => self::BASE_NAMESPACE_TYPES],
+                ['namespace' => Namespaces::BASE_NAMESPACE_TYPES],
             ],
         ];
-
-        $clients = [
-            [
-                'TypedClient',
-                ['namespace' => self::BASE_NAMESPACE, 'schema' => $schema],
-            ],
-            [
-                'Client',
-                ['namespace' => self::BASE_NAMESPACE, 'schema' => $schema],
-            ],
-        ];
-
-        foreach ($types as $type) {
-            $this->generate($baseDirTypes, ...$type);
-        }
-
-        foreach ($clients as $type) {
-            $this->generate($baseDir, ...$type);
-        }
-
-        foreach ($schema['types'] as $type) {
-            $data = [
-                $baseDirTypes,
-                $type['name'],
-                [
-                    'type' => $type,
-                    'namespace' => self::BASE_NAMESPACE_TYPES,
-                ],
-                'Type',
-            ];
-
-            $this->generate(...$data);
-        }
     }
 
-    private function generate(string $basePath, string $type, array $data = [], string $template = null): void
+    private function generate(string $basePath, string $type, array $data = [], string $customTemplate = null): void
     {
-        $templateFile = $template ?? $type;
+        $templateFile = $customTemplate ?? $type;
         $filePath = "{$basePath}/{$type}.php";
 
         try {
@@ -158,5 +203,19 @@ class GenerateClientCommand extends Command
         if (file_put_contents($filePath, $content) === false) {
             throw new RuntimeException("Failed write to file {$filePath}");
         }
+    }
+
+    private function getDefaultClients(array $schema): array
+    {
+        return [
+            [
+                TemplateFile::TYPED_CLIENT,
+                ['namespace' => Namespaces::BASE_NAMESPACE, 'schema' => $schema],
+            ],
+            [
+                TemplateFile::CLIENT,
+                ['namespace' => Namespaces::BASE_NAMESPACE, 'schema' => $schema],
+            ],
+        ];
     }
 }
