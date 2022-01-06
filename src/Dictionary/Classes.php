@@ -13,6 +13,8 @@ class Classes
 
     public const INPUT_FILE = 'InputFile';
 
+    public const CHAT_MEMBER = 'AbstractChatMember';
+
     public const ABSTRACT_TYPE = 'AbstractType';
     public const TELEGRAM_EXCEPTION = 'TelegramException';
 }

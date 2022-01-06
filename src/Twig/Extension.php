@@ -175,7 +175,7 @@ class Extension extends AbstractExtension
                 return 'string';
             }
 
-            throw new RuntimeException('Unreachable JMS type');
+            return 'string';
         }
 
         $type = trim($types[0]['type'], '\\');

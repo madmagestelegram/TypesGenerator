@@ -14,6 +14,8 @@ class Types
         'Formatting options',
         'Inline mode methods',
         'CallbackGame',
+        'ChatMember',
+        'Determining list of commands',
     ];
 
     public const PARENT_ALIAS = [
@@ -22,9 +24,18 @@ class Types
         'InlineQueryResult' => Classes::INLINE_QUERY_RESULT,
         'InputMessageContent' => Classes::INPUT_MESSAGE_CONTENT,
         'InputFile' => Classes::INPUT_FILE,
+        'ChatMember' => Classes::CHAT_MEMBER,
     ];
 
     public const ALIAS_TYPES = [
+        'ChatMember' => [
+            'ChatMemberOwner',
+            'ChatMemberAdministrator',
+            'ChatMemberMember',
+            'ChatMemberRestricted',
+            'ChatMemberLeft',
+            'ChatMemberBanned',
+        ],
         'PassportElementError' => [
             'PassportElementErrorDataField',
             'PassportElementErrorFrontSide',

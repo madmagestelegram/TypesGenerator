@@ -509,6 +509,9 @@ class GenerateSchemaCommand extends Command
             "/On success, an (?<array>array) of {$href} that were sent is returned/",
             "/On success, if the edited message is not an inline message, the edited {$href} is returned, otherwise {$em} is returned/",
             "/invite link as (?:a )?{$href} object/",
+            "/On success, if the message is not an inline message, the edited {$href} is returned, otherwise {$em} is returned./",
+            "/On success, the stopped {$href} is returned./",
+            "/On success, if the message is not an inline message, the {$href} is returned, otherwise {$em} is returned./",
         ];
     }
 
