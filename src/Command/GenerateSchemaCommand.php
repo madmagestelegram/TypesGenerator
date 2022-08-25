@@ -512,6 +512,9 @@ class GenerateSchemaCommand extends Command
             "/On success, if the message is not an inline message, the edited {$href} is returned, otherwise {$em} is returned./",
             "/On success, the stopped {$href} is returned./",
             "/On success, if the message is not an inline message, the {$href} is returned, otherwise {$em} is returned./",
+            "/Returns an (?<array>Array) of {$href} objects/",
+            "/Returns {$href} on success/",
+            "/Returns the created invoice link as {$em} on success./",
         ];
     }
 
