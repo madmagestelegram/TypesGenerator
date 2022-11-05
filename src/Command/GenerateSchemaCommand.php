@@ -515,6 +515,7 @@ class GenerateSchemaCommand extends Command
             "/Returns an (?<array>Array) of {$href} objects/",
             "/Returns {$href} on success/",
             "/Returns the created invoice link as {$em} on success./",
+            "/Returns information about the created topic as a $href object./",
         ];
     }
 
