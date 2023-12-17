@@ -25,6 +25,7 @@ class Types
         'InputMessageContent' => Classes::INPUT_MESSAGE_CONTENT,
         'InputFile' => Classes::INPUT_FILE,
         'ChatMember' => Classes::CHAT_MEMBER,
+        'MenuButton' => Classes::MENU_BUTTON,
     ];
 
     public const ALIAS_TYPES = [
@@ -81,6 +82,11 @@ class Types
             'InputLocationMessageContent',
             'InputVenueMessageContent',
             'InputContactMessageContent',
+        ],
+        'MenuButton' => [
+            'MenuButtonCommands',
+            'MenuButtonWebApp',
+            'MenuButtonDefault',
         ],
     ];
 }

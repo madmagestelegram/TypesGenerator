@@ -199,6 +199,15 @@ class GenerateTypesCommand extends Command
                 TemplateFile::ABSTRACT_SIMPLE_TYPE,
             ],
             [
+                Classes::MENU_BUTTON,
+                [
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
+                    'class' => Classes::MENU_BUTTON,
+                    'parent' => Classes::ABSTRACT_TYPE,
+                ],
+                TemplateFile::ABSTRACT_SIMPLE_TYPE,
+            ],
+            [
                 Classes::ABSTRACT_TYPE,
                 ['namespace' => Namespaces::BASE_NAMESPACE_TYPES],
             ],
