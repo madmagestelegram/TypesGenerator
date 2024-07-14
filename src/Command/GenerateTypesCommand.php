@@ -8,6 +8,7 @@ use MadmagesTelegram\TypesGenerator\Dictionary\Classes;
 use MadmagesTelegram\TypesGenerator\Dictionary\File;
 use MadmagesTelegram\TypesGenerator\Dictionary\Namespaces;
 use MadmagesTelegram\TypesGenerator\Dictionary\TemplateFile;
+use MadmagesTelegram\TypesGenerator\Dictionary\Types;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -15,9 +16,6 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\HttpKernel\KernelInterface;
 use Twig\Environment;
-use Twig\Error\LoaderError;
-use Twig\Error\RuntimeError;
-use Twig\Error\SyntaxError;
 use function json_decode;
 
 class GenerateTypesCommand extends Command
@@ -91,17 +89,15 @@ class GenerateTypesCommand extends Command
         $output->writeln('  -> Utils');
 
         foreach ($schema['types'] as $type) {
-            $data = [
+            $this->generate(
                 $baseDirectoryTypes,
                 $type['name'],
                 [
                     'type' => $type,
                     'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
                 ],
-                'Type',
-            ];
-
-            $this->generate(...$data);
+                TemplateFile::CUSTOM_TEMPLATE_FOR_TYPE[$type['name']] ?? TemplateFile::TYPE
+            );
         }
         $output->writeln("  -> Types: " . count($schema['types']));
 
@@ -144,73 +140,26 @@ class GenerateTypesCommand extends Command
 
     private function getDefaultTypes(): array
     {
+        $abstractClasses = [];
+        foreach (array_keys(Types::ALIAS_TYPES) as $type) {
+            $abstractType = 'Abstract' . $type;
+            $abstractClasses[] = [
+                $abstractType,
+                [
+                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
+                    'class' => $abstractType,
+                    'parent' => Classes::ABSTRACT_TYPE,
+                ],
+                TemplateFile::ABSTRACT_SIMPLE_TYPE,
+            ];
+        }
+
         return [
-            [
-                Classes::INLINE_QUERY_RESULT,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::INLINE_QUERY_RESULT,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-                TemplateFile::ABSTRACT_SIMPLE_TYPE,
-            ],
-            [
-                Classes::INPUT_MESSAGE_CONTENT,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::INPUT_MESSAGE_CONTENT,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-                TemplateFile::ABSTRACT_SIMPLE_TYPE,
-            ],
-            [
-                Classes::INPUT_FILE,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::INPUT_FILE,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-            ],
-            [
-                Classes::INPUT_MEDIA,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::INPUT_MEDIA,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-                TemplateFile::ABSTRACT_SIMPLE_TYPE,
-            ],
-            [
-                Classes::PASSPORT_ERROR,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::PASSPORT_ERROR,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-                TemplateFile::ABSTRACT_SIMPLE_TYPE,
-            ],
-            [
-                Classes::CHAT_MEMBER,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::CHAT_MEMBER,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-                TemplateFile::ABSTRACT_SIMPLE_TYPE,
-            ],
-            [
-                Classes::MENU_BUTTON,
-                [
-                    'namespace' => Namespaces::BASE_NAMESPACE_TYPES,
-                    'class' => Classes::MENU_BUTTON,
-                    'parent' => Classes::ABSTRACT_TYPE,
-                ],
-                TemplateFile::ABSTRACT_SIMPLE_TYPE,
-            ],
             [
                 Classes::ABSTRACT_TYPE,
                 ['namespace' => Namespaces::BASE_NAMESPACE_TYPES],
             ],
+            ...$abstractClasses,
         ];
     }
 
@@ -219,11 +168,7 @@ class GenerateTypesCommand extends Command
         $templateFile = $customTemplate ?? $type;
         $filePath = "{$basePath}/{$type}.php";
 
-        try {
-            $content = $this->twig->render("{$templateFile}.twig", $data);
-        } catch (LoaderError | RuntimeError | SyntaxError $e) {
-            throw new RuntimeException($e->getMessage(), $e->getCode(), $e);
-        }
+        $content = $this->twig->render("{$templateFile}.twig", $data);
 
         if (file_put_contents($filePath, $content) === false) {
             throw new RuntimeException("Failed write to file {$filePath}");

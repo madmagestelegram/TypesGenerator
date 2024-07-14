@@ -12,4 +12,8 @@ class TemplateFile
     public const CLIENT = 'Client';
     public const SERIALIZER = 'Serializer';
     public const SIMPLE_CLASS = 'SimpleClass';
+
+    const CUSTOM_TEMPLATE_FOR_TYPE = [
+        Types::INPUT_FILE => 'InputFile'
+    ];
 }

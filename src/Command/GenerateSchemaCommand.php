@@ -161,7 +161,7 @@ class GenerateSchemaCommand extends Command
         foreach ($tgItems as $itemName => $tgItem) {
             if (
                 !$tgItem['isType']
-                || array_key_exists($itemName, Types::ALIAS_TYPES)
+                || isset(Types::ALIAS_TYPES[$itemName])
                 || in_array($itemName, Types::SKIP_TYPES, true)
             ) {
                 continue;
@@ -189,6 +189,10 @@ class GenerateSchemaCommand extends Command
                         ];
                     }
                 );
+            }
+
+            if (empty($fields) && !in_array($itemName, Types::ALLOWED_EMPTY_TYPES, true)) {
+                throw new RuntimeException('Empty fields on type: ' . $itemName);
             }
 
             $this->schema['types'][$itemName] = [
@@ -290,8 +294,8 @@ class GenerateSchemaCommand extends Command
     private function parseType(string $text): array
     {
         if (strpos($text, 'Array of ') !== false) {
-            [, $text] = explode(' of ', $text);
-            $types = $this->parseType($text);
+            [, $targetType] = explode(' of ', $text);
+            $types = $this->parseType($targetType);
             foreach ($types as $index => $type) {
                 $types[$index]['is_array'] = true;
             }
@@ -328,37 +332,33 @@ class GenerateSchemaCommand extends Command
             return [['type' => 'array', 'is_array' => false]];
         }
 
-        if ($text === 'String' || $text === 'Integer or String') {
+        if ($text === 'String') {
             return [['type' => 'string', 'is_array' => false]];
         }
 
-        if ($text === 'Array of String') {
-            return [['type' => 'string', 'is_array' => false]];
-        }
-
-        if (array_key_exists($text, Types::PARENT_ALIAS)) {
-            return [['type' => $this->getClassName(Types::PARENT_ALIAS[$text]), 'is_array' => false]];
+        if (isset(Types::ALIAS_TYPES[$text])) {
+            return [['type' => $this->getFQCN($text, true), 'is_array' => false]];
         }
 
         if ($this->isObject($text)) {
-            return [['type' => $this->getClassName($text), 'is_array' => false]];
+            return [['type' => $this->getFQCN($text), 'is_array' => false]];
         }
 
         throw new ParseError("Unexpected type: {$text}");
     }
 
-    private function getClassName(string $className): string
+    private function getFQCN(string $className, bool $abstract = false): string
     {
-        return '\\' . Namespaces::BASE_NAMESPACE_TYPES . '\\' . $className;
+        return '\\' . Namespaces::BASE_NAMESPACE_TYPES . '\\' . ($abstract ? 'Abstract' : '') . $className;
     }
 
-    private function isObject(string $text): bool
+    private function isObject(string $type): bool
     {
-        if (isset($this->schema['types'][$text])) {
+        if (isset($this->schema['types'][$type])) {
             return true;
         }
 
-        throw new ParseError("Undefined type: {$text}");
+        throw new ParseError("Undefined type: {$type}");
     }
 
     private function getRestrictions(string $text): array
@@ -407,29 +407,14 @@ class GenerateSchemaCommand extends Command
 
     private function getParent(string $type): string
     {
-        if (array_key_exists($type, Types::PARENT_ALIAS)) {
-            return $this->getClassName(Types::PARENT_ALIAS[$type]);
-        }
-
         foreach (Types::ALIAS_TYPES as $aliasName => $aliases) {
-            if (
-                array_key_exists($aliasName, Types::PARENT_ALIAS)
-                && in_array($type, $aliases, true)
-            ) {
-                return $this->getClassName(Types::PARENT_ALIAS[$aliasName]);
+            if (in_array($type, $aliases, true)) {
+                return $this->getFQCN($aliasName, true);
             }
         }
 
-        if (strpos($type, 'InlineQueryResult') === 0) {
-            return $this->getClassName(Classes::INLINE_QUERY_RESULT);
-        }
-
-        if (strpos($type, 'Input') === 0 && strpos($type, 'MessageContent') !== false) {
-            return $this->getClassName(Classes::INPUT_MESSAGE_CONTENT);
-        }
-
         if (ctype_upper($type[0])) {
-            return $this->getClassName(Classes::ABSTRACT_TYPE);
+            return $this->getFQCN(Classes::ABSTRACT_TYPE);
         }
 
         throw new ParseError("Cannot determine parent of type: {$type}");
@@ -516,6 +501,7 @@ class GenerateSchemaCommand extends Command
             "/Returns {$href} on success/",
             "/Returns the created invoice link as {$em} on success./",
             "/Returns information about the created topic as a $href object./",
+            "/On success, an (?<array>array) of $href of the sent messages is returned./",
         ];
     }
 

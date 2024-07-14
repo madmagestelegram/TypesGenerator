@@ -6,16 +6,6 @@ namespace MadmagesTelegram\TypesGenerator\Dictionary;
 
 class Classes
 {
-    public const PASSPORT_ERROR = 'AbstractPassportElementError';
-    public const INPUT_MEDIA = 'AbstractInputMedia';
-    public const INLINE_QUERY_RESULT = 'AbstractInlineQueryResult';
-    public const INPUT_MESSAGE_CONTENT = 'AbstractInputMessageContent';
-
-    public const INPUT_FILE = 'InputFile';
-
-    public const CHAT_MEMBER = 'AbstractChatMember';
-    public const MENU_BUTTON = 'AbstractMenuButton';
-
     public const ABSTRACT_TYPE = 'AbstractType';
     public const TELEGRAM_EXCEPTION = 'TelegramException';
 }

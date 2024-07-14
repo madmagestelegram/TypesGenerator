@@ -171,10 +171,6 @@ class Extension extends AbstractExtension
     private function renderJMSType(array $types): string
     {
         if (count($types) > 1) {
-            if (count($types) === 2 && strpos($types[0]['type'], Classes::INPUT_FILE) !== false) {
-                return 'string';
-            }
-
             return 'string';
         }
 

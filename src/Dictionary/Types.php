@@ -7,26 +7,29 @@ namespace MadmagesTelegram\TypesGenerator\Dictionary;
 class Types
 {
 
+    public const INPUT_FILE = 'InputFile';
+
+    public const ALLOWED_EMPTY_TYPES = [
+        self::INPUT_FILE,
+        'ForumTopicClosed',
+        'ForumTopicReopened',
+        'GeneralForumTopicHidden',
+        'GeneralForumTopicUnhidden',
+        'VideoChatStarted',
+        'GiveawayCreated',
+    ];
+
     public const SKIP_TYPES = [
-        'InputFile',
         'Sending files',
         'Inline mode objects',
         'Formatting options',
         'Inline mode methods',
         'CallbackGame',
-        'ChatMember',
+        'Accent colors',
+        'Profile accent colors',
         'Determining list of commands',
     ];
 
-    public const PARENT_ALIAS = [
-        'PassportElementError' => Classes::PASSPORT_ERROR,
-        'InputMedia' => Classes::INPUT_MEDIA,
-        'InlineQueryResult' => Classes::INLINE_QUERY_RESULT,
-        'InputMessageContent' => Classes::INPUT_MESSAGE_CONTENT,
-        'InputFile' => Classes::INPUT_FILE,
-        'ChatMember' => Classes::CHAT_MEMBER,
-        'MenuButton' => Classes::MENU_BUTTON,
-    ];
 
     public const ALIAS_TYPES = [
         'ChatMember' => [
@@ -76,17 +79,78 @@ class Types
             'InlineQueryResultVenue',
             'InlineQueryResultVideo',
             'InlineQueryResultVoice',
+            'InlineQueryResultsButton',
         ],
         'InputMessageContent' => [
             'InputTextMessageContent',
             'InputLocationMessageContent',
             'InputVenueMessageContent',
             'InputContactMessageContent',
+            'InputInvoiceMessageContent',
         ],
         'MenuButton' => [
             'MenuButtonCommands',
             'MenuButtonWebApp',
             'MenuButtonDefault',
+        ],
+        'BackgroundFill' => [
+            'BackgroundFillSolid',
+            'BackgroundFillGradient',
+            'BackgroundFillFreeformGradient',
+        ],
+        'MaybeInaccessibleMessage' => [
+            'Message',
+            'InaccessibleMessage',
+        ],
+        'MessageOrigin' => [
+            'MessageOriginUser',
+            'MessageOriginHiddenUser',
+            'MessageOriginChat',
+            'MessageOriginChannel',
+        ],
+        'PaidMedia' => [
+            'PaidMediaPreview',
+            'PaidMediaPhoto',
+            'PaidMediaVideo',
+        ],
+        'BackgroundType' => [
+            'BackgroundTypeFill',
+            'BackgroundTypeWallpaper',
+            'BackgroundTypePattern',
+            'BackgroundTypeChatTheme',
+        ],
+        'ReactionType' => [
+            'ReactionTypeEmoji',
+            'ReactionTypeCustomEmoji',
+        ],
+        'BotCommandScope' => [
+            'BotCommandScopeDefault',
+            'BotCommandScopeAllPrivateChats',
+            'BotCommandScopeAllGroupChats',
+            'BotCommandScopeAllChatAdministrators',
+            'BotCommandScopeChat',
+            'BotCommandScopeChatAdministrators',
+            'BotCommandScopeChatMember',
+        ],
+        'ChatBoostSource' => [
+            'ChatBoostSourcePremium',
+            'ChatBoostSourceGiftCode',
+            'ChatBoostSourceGiveaway',
+        ],
+        'InputPaidMedia' => [
+            'InputPaidMediaPhoto',
+            'InputPaidMediaVideo',
+        ],
+        'RevenueWithdrawalState' => [
+            'RevenueWithdrawalStatePending',
+            'RevenueWithdrawalStateSucceeded',
+            'RevenueWithdrawalStateFailed',
+        ],
+        'TransactionPartner' => [
+            'TransactionPartnerUser',
+            'TransactionPartnerFragment',
+            'TransactionPartnerTelegramAds',
+            'TransactionPartnerOther',
         ],
     ];
 }
