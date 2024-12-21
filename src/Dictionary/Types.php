@@ -23,6 +23,7 @@ class Types
         'Sending files',
         'Inline mode objects',
         'Formatting options',
+        'Paid Broadcasts',
         'Inline mode methods',
         'CallbackGame',
         'Accent colors',
